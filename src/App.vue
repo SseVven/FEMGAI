@@ -12,8 +12,6 @@ import { ref, onMounted } from 'vue'
 import Navbar from './NavBar.vue'
 import Foobar from './Footer.vue'
 import Lefbar from './LeftBar.vue'
-// import HelloWorld from './components/HelloWorld.vue'
-// import TheWelcome from './components/TheWelcome.vue'
 import VtkWindow from './components/VtkWindow.vue'
 
 const son = ref();
@@ -24,6 +22,7 @@ onMounted(() => {
     console.log(son.value.fullScreenRenderer);
     son.value.fullScreenRenderer.getRenderer().resetCamera()
     son.value.fullScreenRenderer.getRenderWindow().render()
+    // son.value.reatemode
   }
 })
 </script>
@@ -35,7 +34,7 @@ onMounted(() => {
 }
 
 #Foot {
-  background-color: #193854;
+  background-color: #295b89;
   height: 47px;
 }
 
@@ -43,11 +42,14 @@ main {
   flex: 1;
   display: flex;
   flex-direction: row;
-  background-color: pink;
+  background-color: #f1f1f1;
+  border-top: 1px solid #295b89;
 }
 
 #Left {
   min-width: 400px;
+  /* resize: horizontal; */
+  /* overflow: hidden; */
 }
 
 #Screen {

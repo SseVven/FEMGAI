@@ -13,64 +13,128 @@ import '@kitware/vtk.js/Rendering/Profiles/Geometry';
 
 import vtkFullScreenRenderWindow from '@kitware/vtk.js/Rendering/Misc/FullScreenRenderWindow';
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
-import vtkConcentricCylinderSource from '@kitware/vtk.js/Filters/Sources/ConcentricCylinderSource';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 
-
-import { ColorMode, ScalarMode }    from '@kitware/vtk.js/Rendering/Core/Mapper/Constants';
-
 // import controlPanel from './controlPanel.html';
+import EventBus from '@/assets/common/event-bus';
+// import source
+import vtkCubeSource from '@kitware/vtk.js/Filters/Sources/CubeSource';
+import vtkConeSource from '@kitware/vtk.js/Filters/Sources/ConeSource';
+import vtkCylinderSource from '@kitware/vtk.js/Filters/Sources/CylinderSource';
+import vtkSphereSource from '@kitware/vtk.js/Filters/Sources/SphereSource';
+import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
+import vtkOrientationMarkerWidget from '@kitware/vtk.js/Interaction/Widgets/OrientationMarkerWidget';
 
 
 let fullScreenRenderer = ref(null);
-let msg = ref("dasdasd")
+const global = {};
 onMounted(() => {
+  // 生成window
   fullScreenRenderer.value = vtkFullScreenRenderWindow.newInstance({
     background: [0.5, 0.5, 0.5],
     container: sectionRef.value,
   });
-  msg.value = "changed"
-  console.log(`the component is now mounted.`)
-  console.log(sectionRef.value);
-  console.log(sectionRef);
-  console.log(fullScreenRenderer.value);
-  console.log(fullScreenRenderer);
-  console.log(msg.value);
-  console.log(msg);
-  const renderer = fullScreenRenderer.value.getRenderer();
-  const renderWindow = fullScreenRenderer.value.getRenderWindow();
-
-  const cylinder = vtkConcentricCylinderSource.newInstance({
-    height: 0.25,
-    radius: [0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
-    cellFields: [0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
-    resolution: 60,
-    skipInnerFaces: true,
+  global.renderer = fullScreenRenderer.value.getRenderer();
+  global.renderWindow = fullScreenRenderer.value.getRenderWindow();
+  global.interactor = fullScreenRenderer.value.getInteractor();
+  // 设置背景
+  global.renderer.setBackground(255,255,255);
+  // 生成 axes actor
+  global.axesActor = vtkAxesActor.newInstance({
+    config: {
+      recenter: false,
+      tipLength: 0.2,
+      tipRadius: 0.1,
+      shaftRadius: 0.03
+    },
+    yConfig: {
+      color: [0, 255, 0],
+    },
+    zConfig: {
+      color: [0, 0, 255]
+    }
   });
+  global.orientationMarkerWidget = vtkOrientationMarkerWidget.newInstance();
+  global.orientationMarkerWidget.setParentRenderer(global.renderer);
+  global.orientationMarkerWidget.setInteractor(global.interactor);
+  global.orientationMarkerWidget.setActor(global.axesActor);
+  global.orientationMarkerWidget.setEnabled(true);
+
+  global.renderer.resetCamera();
+  global.renderWindow.render();
+});
+
+//定义api
+const createModel3 = (modelName) => {
+  // let source = vtkConcentricCylinderSource.newInstance({
+  //   height: 0.25,
+  //   radius: [0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
+  //   cellFields: [0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
+  //   resolution: 60,
+  //   skipInnerFaces: true,
+  // });
+  let source;
+  if (modelName == '立方体') {
+    source = vtkCubeSource.newInstance({
+      xLength: 1,
+      yLength: 1,
+      zLength: 1,
+    });
+  } else if (modelName == '圆锥') {
+    source = vtkConeSource.newInstance({
+      height: 1,
+      radius: 1,
+      resolution: 100
+    });
+  } else if (modelName == '圆柱体') {
+    source = vtkCylinderSource.newInstance({
+      height: 1,
+      radius: 1,
+    });
+  } else if (modelName == '球体') {
+    source = vtkSphereSource.newInstance({
+      radius: 0.1,
+    });
+  } else {
+    return;
+  }
   const actor = vtkActor.newInstance();
   const mapper = vtkMapper.newInstance();
 
   actor.setMapper(mapper);
-  mapper.setInputConnection(cylinder.getOutputPort());
+  mapper.setInputConnection(source.getOutputPort());
 
-  renderer.addActor(actor);
-  renderer.resetCamera();
-  renderWindow.render();
+  global.renderer.addActor(actor);
+  global.renderer.resetCamera();
+  global.renderWindow.render();
+}
+const showAxes = () => {
 
-  // global.cylinder = cylinder;
-  // global.renderer = renderer;
-  // global.renderWindow = renderWindow;
-});
+}
+//
+EventBus.on('tool-click', (val) => {
+  console.log("vtkWindow", val);
+  switch (val[0]) {
+    case '模型':
+      createModel3(val[1]);
+      break;
 
+    default:
+      break;
+  }
+})
+//
 defineExpose({
   fullScreenRenderer,
-  // msg
+  createModel3
 });
 </script>
 
 
 <style scoped>
 div {
+  margin: 3px;
   background-color: #000;
+  border: 1px solid #ccc
 }
 </style>
