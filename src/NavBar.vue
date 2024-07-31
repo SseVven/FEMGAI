@@ -192,7 +192,6 @@ for (let i = 0; i < name_en.length; i++) {
 
 // 点击工具 val: ["File", "保存"]
 const HandleClick = (val) => {
-  console.log("NavBar", val);
   EventBus.emit("tool-click", val);
 }
 </script>

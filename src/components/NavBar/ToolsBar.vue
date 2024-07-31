@@ -10,7 +10,6 @@ const props = defineProps({
     }
 })
 const btnsize = ['btn_l', 'btn_m', 'btn_s']
-
 const emits = defineEmits(["click"])
 const onClick = (btn) => {
     emits("click", btn)
@@ -23,7 +22,7 @@ const onClick = (btn) => {
                 <div class="tools">
                     <button v-for="tool in item.tools" :key="tool.icon"
                         :class="tool.icon + ' btn btn-light iconfont ' + btnsize[tool.type]" type="button"
-                        @click="onClick([item.name, tool.title])"></button>
+                        @click="onClick([item.name, tool.title])"><p>{{ tool.title }}</p></button>
                 </div>
                 <p class="tools_name ">{{ item.name }}</p>
             </div>
@@ -76,17 +75,29 @@ button {
     font-size: 40px;
     line-height: 40px;
 }
+.btn_l p{
+    font-size: 14px;
+}
 
 .btn_m {
     height: 50%;
-    font-size: 30px;
+    font-size: 20px;
     line-height: 30px;
 }
+.btn_m p{
+    visibility: hidden;
+    font-size: 10px;
+}
+
 
 .btn_s {
     height: 33.3%;
     font-size: 20px;
     line-height: 20px;
+}
+.btn_s p{
+    display: inline;
+    font-size: 10px;
 }
 
 .tools_name {

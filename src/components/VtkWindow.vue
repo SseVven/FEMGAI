@@ -1,5 +1,5 @@
 <template>
-  <div ref="sectionRef">
+  <div @click="sendCamerainfo()" ref="sectionRef">
   </div>
 </template>
 
@@ -17,17 +17,336 @@ import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 
 // import controlPanel from './controlPanel.html';
 import EventBus from '@/assets/common/event-bus';
-// import source
-import vtkCubeSource from '@kitware/vtk.js/Filters/Sources/CubeSource';
-import vtkConeSource from '@kitware/vtk.js/Filters/Sources/ConeSource';
-import vtkCylinderSource from '@kitware/vtk.js/Filters/Sources/CylinderSource';
-import vtkSphereSource from '@kitware/vtk.js/Filters/Sources/SphereSource';
 import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
 import vtkOrientationMarkerWidget from '@kitware/vtk.js/Interaction/Widgets/OrientationMarkerWidget';
 
+import vtkCellArray from '@kitware/vtk.js/Common/Core/CellArray';
+import vtkPoints from '@kitware/vtk.js/Common/Core/Points';
+import vtkPolyData from '@kitware/vtk.js/Common/DataModel/PolyData';
+
+import vtkProperty from '@kitware/vtk.js/Rendering/Core/Property'
 
 let fullScreenRenderer = ref(null);
 const global = {};
+
+// ================================================================================ 组件控制器
+// 定义模型数据
+const ModelType = {
+  "立方体": 0,
+  "圆锥": 1,
+  "圆柱体": 2,
+  "球体": 3,
+  "复合体": 4,
+}
+const ModelData = {
+  /*
+  "key":{
+    "type": String
+    "model_type": String
+    "name": String
+    "actor": vtkActor
+    "params": Object
+    "volumns": Array
+    "property":
+    "components": Array
+  }
+  */
+}
+const getAKey = new Date().getTime().toString(36);
+const DataStruct = [
+  {
+    title: 'File ' + getAKey,
+    type: 'File',
+    key: getAKey,
+    children: []
+  }
+]
+ModelData[getAKey] = {
+  name: DataStruct[0].title,
+  type: DataStruct[0].type,
+  key: getAKey
+};
+// 组件控制器 修改
+const onChange = (val) => {
+  EventBus.emit("dataStructChange", val);
+}
+// 初始化
+onChange([0, DataStruct]);
+EventBus.on('component-node-query', (val) => {
+  console.log("component-node-query", val);
+  EventBus.emit("component-node-queryRes", ModelData[val[0]]);
+})
+// info changed
+EventBus.on('Property-changed', (val) => {
+  console.log("Property-changed", val);
+  if (val[1] == 'color')
+    ModelData[val[0]].actor.getProperty().setColor(ModelData[val[0]].property.color)
+  else if (val[1] == 'opacity')
+    ModelData[val[0]].actor.getProperty().setOpacity(ModelData[val[0]].property.opacity)
+  global.renderWindow.render();
+})
+// ================================================================================ 组件控制器 end
+
+//定义api
+// ================================================================================ cameracontrol
+const cameraControl = (mode, params) => {
+  // 固定视角
+  if (mode === 0) {
+    // console.log("mode:0");
+    global.camera.setPosition(params.Position[0], params.Position[1], params.Position[2]);
+    global.camera.setFocalPoint(params.FocalPoint[0], params.FocalPoint[1], params.FocalPoint[2])
+    global.camera.setViewUp(params.ViewUp[0], params.ViewUp[1], params.ViewUp[2])
+    global.camera.setViewAngle(params.ViewAngle)
+  } else if (mode === 1) {
+    // console.log("mode:1");
+    global.camera.setPosition(params.Position[0], params.Position[1], params.Position[2]);
+    global.camera.setFocalPoint(params.FocalPoint[0], params.FocalPoint[1], params.FocalPoint[2])
+    global.camera.setViewUp(params.ViewUp[0], params.ViewUp[1], params.ViewUp[2])
+    global.camera.setViewAngle(params.ViewAngle)
+    global.renderer.resetCamera();
+  }
+  // 移动视角
+  else if (mode === 2) {
+    console.log("mode:2");
+  }
+  // global.renderer.resetCamera();
+  global.renderWindow.render();
+}
+// 接收信息
+EventBus.on('camera-choose', (val) => {
+  // console.log("'camera-choose get:'", val);
+  cameraControl(val[0], val[1]);
+})
+// 传递相机参数
+const sendCamerainfo = () => {
+  EventBus.emit("camera-info", {
+    Position: global.camera.getPosition(),
+    ViewUp: global.camera.getViewUp(),
+    ViewAngle: global.camera.getViewAngle(),
+    FocalPoint: global.camera.getFocalPoint(),
+    ClippingRange: global.camera.getClippingRange(),
+  })
+}
+// ================================================================================ cameracontrol end
+// 输入三维向量，输出任一垂直单位向量
+function getPerpendicularUnitVector(v) {
+  // Destructure the input vector
+  let [vx, vy, vz] = v;
+
+  // Choose a vector that is not parallel to v
+  let w;
+  if (Math.abs(vx) > Math.abs(vy)) {
+    w = [vy, -vx, 0];
+  } else {
+    w = [0, -vz, vy];
+  }
+
+  // Calculate the cross product to get a perpendicular vector
+  let ux = vy * w[2] - vz * w[1];
+  let uy = vz * w[0] - vx * w[2];
+  let uz = vx * w[1] - vy * w[0];
+  let u = [ux, uy, uz];
+
+  // Normalize the perpendicular vector to make it a unit vector
+  let length = Math.sqrt(ux * ux + uy * uy + uz * uz);
+  u = u.map(component => component / length);
+
+  return u;
+}
+// 输入:三维向量a,b,数字deg，输出:b绕a旋转deg°后的向量// 右手定则
+function rotateVectorAroundAxis(a, b, deg) {
+  // Convert degrees to radians
+  let rad = deg * (Math.PI / 180);
+
+  // Normalize vector a
+  let lengthA = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+  let u = a.map(component => component / lengthA);
+
+  let ux = u[0], uy = u[1], uz = u[2];
+
+  // Calculate the cosine and sine of the angle
+  let cosTheta = Math.cos(rad);
+  let sinTheta = Math.sin(rad);
+
+  // Rodrigues' rotation formula components
+  let oneMinusCosTheta = 1 - cosTheta;
+  let dotProduct = ux * b[0] + uy * b[1] + uz * b[2];
+
+  let rotatedX = (cosTheta + ux * ux * oneMinusCosTheta) * b[0] +
+    (ux * uy * oneMinusCosTheta - uz * sinTheta) * b[1] +
+    (ux * uz * oneMinusCosTheta + uy * sinTheta) * b[2];
+
+  let rotatedY = (uy * ux * oneMinusCosTheta + uz * sinTheta) * b[0] +
+    (cosTheta + uy * uy * oneMinusCosTheta) * b[1] +
+    (uy * uz * oneMinusCosTheta - ux * sinTheta) * b[2];
+
+  let rotatedZ = (uz * ux * oneMinusCosTheta - uy * sinTheta) * b[0] +
+    (uz * uy * oneMinusCosTheta + ux * sinTheta) * b[1] +
+    (cosTheta + uz * uz * oneMinusCosTheta) * b[2];
+
+  return [rotatedX, rotatedY, rotatedZ];
+}
+
+const createModel3 = (modelName) => {
+  let data = vtkPolyData.newInstance();
+  let points = [];
+  let faces = [];
+  const params = {};
+  if (modelName == '立方体') {
+    params.center = [0, 0, 0];
+    params.XLen = [1, 0, 0];
+    params.YLen = [0, 1, 0];
+    params.ZLen = [0, 0, 1];
+
+    points = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
+    faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+  } else if (modelName == '圆锥') {
+    params.center = [0, 0, 0];
+    params.height = 1;
+    params.direct = [0, 0, 1];
+    params.radius = 1;
+
+    const resolution = 150;
+    const APoint = [params.direct[0] * params.height, params.direct[1] * params.height, params.direct[2] * params.height];
+    const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
+    const interalDeg = 360 / resolution;
+    points.push(APoint.map((v, k) => v + params.center[k]));
+    const btm = [];
+    for (let i = 0; i < resolution; i++) {
+      points.push(rotateVectorAroundAxis(params.direct, CPoint, interalDeg * i).map((v, k) => v + params.center[k]));
+      if (i == resolution - 1)
+        faces.push([0, i + 1, 1]);
+      else
+        faces.push([0, i + 1, i + 2]);
+      btm.push(i + 1);
+    }
+    faces.push(btm);
+  } else if (modelName == '圆柱体') {
+    params.center = [0, 0, 0];
+    params.height = 1;
+    params.direct = [0, 0, 1];
+    params.radius = 1;
+
+    const resolution = 150;
+    const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
+    const interalDeg = 360 / resolution;
+    const top = [];
+    const btm = [];
+    for (let i = 0; i < resolution; i++) {
+      let tmp = rotateVectorAroundAxis(params.direct, CPoint, interalDeg * i).map((v, k) => v + params.center[k]);
+      points.push(tmp);
+      points.push(tmp.map((v, k) => v + params.direct[k] * params.height));
+
+      if (i == resolution - 1)
+        faces.push([2 * i, 2 * i + 1, 1, 0]);
+      else
+        faces.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2]);
+
+      btm.push(2 * i);
+      top.push(2 * i + 1);
+    }
+    faces.push(btm);
+    faces.push(top);
+  } else if (modelName == '球体') {
+    params.center = [0, 0, 0];
+    params.radius = 1;
+
+    const resolution = 150;
+    const CPoint = [params.radius, 0, 0];
+    const DPoint = [-params.radius, 0, 0];
+    const interalDeg1 = 180 / resolution;
+    const interalDeg = 360 / resolution;
+
+    points.push(CPoint.map((v, k) => v + params.center[k]));
+    for (let i = 1; i < resolution; i++) {
+      let tmp = rotateVectorAroundAxis([0, 1, 0], CPoint, interalDeg1 * i);
+      for (let j = 0; j < resolution; j++) {
+        let tmp2 = rotateVectorAroundAxis([1, 0, 0], tmp, interalDeg * j).map((v, k) => v + params.center[k]);
+
+        points.push(tmp2);
+      }
+    }
+    points.push(DPoint.map((v, k) => v + params.center[k]));
+
+    for (let i = 0; i < resolution; i++) {
+      if (i == resolution - 1) {
+        faces.push([0, i + 1, 1]);
+        faces.push([resolution * (resolution - 1) + 1, (resolution - 2) * resolution + i + 1, (resolution - 2) * resolution + 1]);
+      }
+      else {
+        faces.push([0, i + 1, i + 2]);
+        faces.push([resolution * (resolution - 1) + 1, (resolution - 2) * resolution + i + 1, (resolution - 2) * resolution + i + 2]);
+      }
+    }
+
+    for (let i = 0; i < resolution - 2; i++) {
+      for (let j = 0; j < resolution; j++) {
+        if (j == resolution - 1)
+          faces.push([i * resolution + j + 1, i * resolution + 1, (i + 1) * resolution + 1, (i + 1) * resolution + j + 1]);
+        else
+          faces.push([i * resolution + j + 1, i * resolution + j + 2, (i + 1) * resolution + j + 2, (i + 1) * resolution + j + 1]);
+      }
+    }
+  } else {
+    return;
+  }
+  const vtkPs = vtkPoints.newInstance();
+  const polys = vtkCellArray.newInstance();
+  for (let i = 0; i < points.length; i++)
+    vtkPs.insertNextPoint(points[i][0], points[i][1], points[i][2]);
+  for (let i = 0; i < faces.length; i++)
+    polys.insertNextCell(faces[i]);
+
+  data.setPoints(vtkPs);
+  data.setPolys(polys);
+
+  const actor = vtkActor.newInstance();
+  const mapper = vtkMapper.newInstance();
+
+  actor.setMapper(mapper);
+  mapper.setInputData(data);
+
+  global.renderer.addActor(actor);
+  console.log(actor);
+  global.renderWindow.render();
+
+  // 数据存储
+  const uniqueId = new Date().getTime().toString(36);
+  const property = actor.getProperty();
+  ModelData[uniqueId] = {
+    type: 'Model',
+    key: uniqueId,
+    name: modelName + "-" + uniqueId,
+    actor: actor,
+    model_type: modelName,
+    params: params,
+    volumns: [],
+    property: {
+      color: property.getColor(),
+      opacity: property.getOpacity(),
+    },
+  };
+  console.log(ModelData);
+
+  // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
+  onChange([1, [0], uniqueId, ModelData[uniqueId].name, 'Model']);
+}
+const showAxes = () => {
+
+}
+//
+EventBus.on('tool-click', (val) => {
+  console.log("vtkWindow", val);
+  switch (val[0]) {
+    case '模型':
+      createModel3(val[1]);
+      break;
+
+    default:
+      break;
+  }
+})
+//
 onMounted(() => {
   // 生成window
   fullScreenRenderer.value = vtkFullScreenRenderWindow.newInstance({
@@ -35,10 +354,11 @@ onMounted(() => {
     container: sectionRef.value,
   });
   global.renderer = fullScreenRenderer.value.getRenderer();
+  global.camera = global.renderer.getActiveCamera();
   global.renderWindow = fullScreenRenderer.value.getRenderWindow();
   global.interactor = fullScreenRenderer.value.getInteractor();
   // 设置背景
-  global.renderer.setBackground(255,255,255);
+  global.renderer.setBackground(0, 0.1, 0.4);
   // 生成 axes actor
   global.axesActor = vtkAxesActor.newInstance({
     config: {
@@ -62,68 +382,8 @@ onMounted(() => {
 
   global.renderer.resetCamera();
   global.renderWindow.render();
+  sendCamerainfo();
 });
-
-//定义api
-const createModel3 = (modelName) => {
-  // let source = vtkConcentricCylinderSource.newInstance({
-  //   height: 0.25,
-  //   radius: [0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
-  //   cellFields: [0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 1],
-  //   resolution: 60,
-  //   skipInnerFaces: true,
-  // });
-  let source;
-  if (modelName == '立方体') {
-    source = vtkCubeSource.newInstance({
-      xLength: 1,
-      yLength: 1,
-      zLength: 1,
-    });
-  } else if (modelName == '圆锥') {
-    source = vtkConeSource.newInstance({
-      height: 1,
-      radius: 1,
-      resolution: 100
-    });
-  } else if (modelName == '圆柱体') {
-    source = vtkCylinderSource.newInstance({
-      height: 1,
-      radius: 1,
-    });
-  } else if (modelName == '球体') {
-    source = vtkSphereSource.newInstance({
-      radius: 0.1,
-    });
-  } else {
-    return;
-  }
-  const actor = vtkActor.newInstance();
-  const mapper = vtkMapper.newInstance();
-
-  actor.setMapper(mapper);
-  mapper.setInputConnection(source.getOutputPort());
-
-  global.renderer.addActor(actor);
-  global.renderer.resetCamera();
-  global.renderWindow.render();
-}
-const showAxes = () => {
-
-}
-//
-EventBus.on('tool-click', (val) => {
-  console.log("vtkWindow", val);
-  switch (val[0]) {
-    case '模型':
-      createModel3(val[1]);
-      break;
-
-    default:
-      break;
-  }
-})
-//
 defineExpose({
   fullScreenRenderer,
   createModel3

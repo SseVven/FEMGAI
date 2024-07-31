@@ -1,5 +1,5 @@
 <template>
-  <Navbar id="Nav" @click="FlashWidnow()" />
+  <Navbar @click="FlashWidnow()" />
   <main>
     <Lefbar id="Left" />
     <VtkWindow ref="son" id="Screen" />
@@ -29,10 +29,6 @@ onMounted(() => {
 
 
 <style scoped>
-#Nav {
-  /* height: 47px; */
-}
-
 #Foot {
   background-color: #295b89;
   height: 47px;
@@ -41,19 +37,23 @@ onMounted(() => {
 main {
   flex: 1;
   display: flex;
+  height: 0;
+  width: 100%;
+  overflow: hidden;
   flex-direction: row;
-  background-color: #f1f1f1;
+  background-color: #ccc;
   border-top: 1px solid #295b89;
+  padding: 7px;
 }
 
 #Left {
-  min-width: 400px;
+  width: 400px;
   /* resize: horizontal; */
   /* overflow: hidden; */
 }
 
 #Screen {
-  flex: auto;
-  height: calc(100vh - 47px - 47px - 116px);
+  flex: 1;
+  /* height: calc(100vh - 47px - 47px - 116px); */
 }
 </style>
