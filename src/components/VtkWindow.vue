@@ -24,13 +24,25 @@ import vtkCellArray from '@kitware/vtk.js/Common/Core/CellArray';
 import vtkPoints from '@kitware/vtk.js/Common/Core/Points';
 import vtkPolyData from '@kitware/vtk.js/Common/DataModel/PolyData';
 
-import vtkProperty from '@kitware/vtk.js/Rendering/Core/Property'
 
 let fullScreenRenderer = ref(null);
 const global = {};
 
 // ================================================================================ 组件控制器
 // 定义模型数据
+const FileType = {
+  "File": 0,
+  "Model": 1,
+  "Component": 2,
+}
+const FileName = [
+  "File", "Model", "Component"
+]
+const FileIcon = [
+  "icon-wenjian",
+  "icon-m_ac_set",
+  "icon-bujian"
+]
 const ModelType = {
   "立方体": 0,
   "圆锥": 1,
@@ -38,6 +50,16 @@ const ModelType = {
   "球体": 3,
   "复合体": 4,
 }
+const ModelName = [
+  "立方体", "圆锥", "圆柱体", "球体", "复合体"
+]
+const ModelIcon = [
+  "icon-m_ac_set",
+  "icon-yuanzhuiti",
+  "icon-cylinder",
+  "icon-fi-sr-sphere",
+  "icon-Save",
+]
 const ModelData = {
   /*
   "key":{
@@ -48,23 +70,34 @@ const ModelData = {
     "params": Object
     "volumns": Array
     "property":
-    "components": Array
+    "components": Array，
+    “data": polydata,
+    "icon": String,
+    "parent": String
   }
   */
 }
-const getAKey = new Date().getTime().toString(36);
+const getAUniKey = () => {
+  return new Date().getTime().toString(36);
+}
+const getAKey = getAUniKey();
 const DataStruct = [
   {
-    title: 'File ' + getAKey,
+    title: 'File-' + getAKey,
     type: 'File',
     key: getAKey,
-    children: []
+    children: [],
+    icon: FileIcon[0],
+    parent: null
   }
 ]
 ModelData[getAKey] = {
   name: DataStruct[0].title,
   type: DataStruct[0].type,
-  key: getAKey
+  key: getAKey,
+  components: [],
+  icon: FileIcon[0],
+  parent: null
 };
 // 组件控制器 修改
 const onChange = (val) => {
@@ -73,16 +106,70 @@ const onChange = (val) => {
 // 初始化
 onChange([0, DataStruct]);
 EventBus.on('component-node-query', (val) => {
-  console.log("component-node-query", val);
+  // console.log("component-node-query", val);
   EventBus.emit("component-node-queryRes", ModelData[val[0]]);
 })
 // info changed
 EventBus.on('Property-changed', (val) => {
-  console.log("Property-changed", val);
+  // console.log("Property-changed", val);
   if (val[1] == 'color')
     ModelData[val[0]].actor.getProperty().setColor(ModelData[val[0]].property.color)
   else if (val[1] == 'opacity')
     ModelData[val[0]].actor.getProperty().setOpacity(ModelData[val[0]].property.opacity)
+  else if (val[1] == 'params') {
+    setPolyData(ModelData[val[0]].model_type, ModelData[val[0]].params, ModelData[val[0]].data);
+  }
+  global.renderWindow.render();
+})
+// 添加 Model
+const newAModelData = (type) => {
+  const obj = {
+    key: getAUniKey(),
+    type: FileName[type],
+    name: FileName[type],
+    params: {},
+    property: {},
+    components: [],
+    icon: FileIcon[type]
+  };
+  return obj;
+}
+//
+EventBus.on('component-add-query', (val) => {
+  const data = ModelData[val[0]];
+  if (data == null)
+    return;
+  // console.log("component-add-query", val, data);
+
+  // 添加模型
+  if (val[1] == 1) {
+    createModel3(ModelName[val[2]], data.key);
+    return;
+  }
+  const model = newAModelData(val[1]);
+  model.parent = data.key;
+  ModelData[model.key] = model;
+  // console.log(ModelData);
+
+  data.components.push(model.key);
+  // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
+  onChange([1, data.key, model.key, model.name, model.type, model.icon]);
+})
+EventBus.on('component-remove-query', (val) => {
+  const data = ModelData[ModelData[val].parent];
+  // console.log("component-remove-query", val, data, DataStruct, ModelData);
+  // 找到父节点然后删掉 or 遍历移除掉 data 的components 的actor
+  const myque = [...data.components];
+  while (myque.length > 0) {
+    const node = ModelData[myque[0]];
+    myque.shift();
+    if ('components' in node) {
+      for (let i = 0; i < node.components.length; i++)
+        myque.push(node.components[i]);
+    } else {
+      global.renderer.removeActor(node.actor);
+    }
+  }
   global.renderWindow.render();
 })
 // ================================================================================ 组件控制器 end
@@ -186,58 +273,39 @@ function rotateVectorAroundAxis(a, b, deg) {
 
   return [rotatedX, rotatedY, rotatedZ];
 }
-
-const createModel3 = (modelName) => {
-  let data = vtkPolyData.newInstance();
+//
+const setPolyData = (type, params, data) => {
   let points = [];
   let faces = [];
-  const params = {};
-  if (modelName == '立方体') {
-    params.center = [0, 0, 0];
-    params.XLen = [1, 0, 0];
-    params.YLen = [0, 1, 0];
-    params.ZLen = [0, 0, 1];
-
+  if (type == '立方体') {
     points = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
     faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
-  } else if (modelName == '圆锥') {
-    params.center = [0, 0, 0];
-    params.height = 1;
-    params.direct = [0, 0, 1];
-    params.radius = 1;
-
-    const resolution = 150;
+  } else if (type == '圆锥') {
     const APoint = [params.direct[0] * params.height, params.direct[1] * params.height, params.direct[2] * params.height];
     const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
-    const interalDeg = 360 / resolution;
+    const interalDeg = 360 / params.resolution;
     points.push(APoint.map((v, k) => v + params.center[k]));
     const btm = [];
-    for (let i = 0; i < resolution; i++) {
+    for (let i = 0; i < params.resolution; i++) {
       points.push(rotateVectorAroundAxis(params.direct, CPoint, interalDeg * i).map((v, k) => v + params.center[k]));
-      if (i == resolution - 1)
+      if (i == params.resolution - 1)
         faces.push([0, i + 1, 1]);
       else
         faces.push([0, i + 1, i + 2]);
       btm.push(i + 1);
     }
     faces.push(btm);
-  } else if (modelName == '圆柱体') {
-    params.center = [0, 0, 0];
-    params.height = 1;
-    params.direct = [0, 0, 1];
-    params.radius = 1;
-
-    const resolution = 150;
+  } else if (type == '圆柱体') {
     const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
-    const interalDeg = 360 / resolution;
+    const interalDeg = 360 / params.resolution;
     const top = [];
     const btm = [];
-    for (let i = 0; i < resolution; i++) {
+    for (let i = 0; i < params.resolution; i++) {
       let tmp = rotateVectorAroundAxis(params.direct, CPoint, interalDeg * i).map((v, k) => v + params.center[k]);
       points.push(tmp);
       points.push(tmp.map((v, k) => v + params.direct[k] * params.height));
 
-      if (i == resolution - 1)
+      if (i == params.resolution - 1)
         faces.push([2 * i, 2 * i + 1, 1, 0]);
       else
         faces.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2]);
@@ -247,20 +315,16 @@ const createModel3 = (modelName) => {
     }
     faces.push(btm);
     faces.push(top);
-  } else if (modelName == '球体') {
-    params.center = [0, 0, 0];
-    params.radius = 1;
-
-    const resolution = 150;
+  } else if (type == '球体') {
     const CPoint = [params.radius, 0, 0];
     const DPoint = [-params.radius, 0, 0];
-    const interalDeg1 = 180 / resolution;
-    const interalDeg = 360 / resolution;
+    const interalDeg1 = 180 / params.resolution;
+    const interalDeg = 360 / params.resolution;
 
     points.push(CPoint.map((v, k) => v + params.center[k]));
-    for (let i = 1; i < resolution; i++) {
+    for (let i = 1; i < params.resolution; i++) {
       let tmp = rotateVectorAroundAxis([0, 1, 0], CPoint, interalDeg1 * i);
-      for (let j = 0; j < resolution; j++) {
+      for (let j = 0; j < params.resolution; j++) {
         let tmp2 = rotateVectorAroundAxis([1, 0, 0], tmp, interalDeg * j).map((v, k) => v + params.center[k]);
 
         points.push(tmp2);
@@ -268,27 +332,25 @@ const createModel3 = (modelName) => {
     }
     points.push(DPoint.map((v, k) => v + params.center[k]));
 
-    for (let i = 0; i < resolution; i++) {
-      if (i == resolution - 1) {
+    for (let i = 0; i < params.resolution; i++) {
+      if (i == params.resolution - 1) {
         faces.push([0, i + 1, 1]);
-        faces.push([resolution * (resolution - 1) + 1, (resolution - 2) * resolution + i + 1, (resolution - 2) * resolution + 1]);
+        faces.push([params.resolution * (params.resolution - 1) + 1, (params.resolution - 2) * params.resolution + i + 1, (params.resolution - 2) * params.resolution + 1]);
       }
       else {
         faces.push([0, i + 1, i + 2]);
-        faces.push([resolution * (resolution - 1) + 1, (resolution - 2) * resolution + i + 1, (resolution - 2) * resolution + i + 2]);
+        faces.push([params.resolution * (params.resolution - 1) + 1, (params.resolution - 2) * params.resolution + i + 1, (params.resolution - 2) * params.resolution + i + 2]);
       }
     }
 
-    for (let i = 0; i < resolution - 2; i++) {
-      for (let j = 0; j < resolution; j++) {
-        if (j == resolution - 1)
-          faces.push([i * resolution + j + 1, i * resolution + 1, (i + 1) * resolution + 1, (i + 1) * resolution + j + 1]);
+    for (let i = 0; i < params.resolution - 2; i++) {
+      for (let j = 0; j < params.resolution; j++) {
+        if (j == params.resolution - 1)
+          faces.push([i * params.resolution + j + 1, i * params.resolution + 1, (i + 1) * params.resolution + 1, (i + 1) * params.resolution + j + 1]);
         else
-          faces.push([i * resolution + j + 1, i * resolution + j + 2, (i + 1) * resolution + j + 2, (i + 1) * resolution + j + 1]);
+          faces.push([i * params.resolution + j + 1, i * params.resolution + j + 2, (i + 1) * params.resolution + j + 2, (i + 1) * params.resolution + j + 1]);
       }
     }
-  } else {
-    return;
   }
   const vtkPs = vtkPoints.newInstance();
   const polys = vtkCellArray.newInstance();
@@ -299,19 +361,47 @@ const createModel3 = (modelName) => {
 
   data.setPoints(vtkPs);
   data.setPolys(polys);
+}
+const createModel3 = (modelName, parent = DataStruct[0].key) => {
+  const data = vtkPolyData.newInstance();
+  const params = {};
+  if (modelName == '立方体') {
+    params.center = [0, 0, 0];
+    params.XLen = 1;
+    params.YLen = 1;
+    params.ZLen = 1;
+  } else if (modelName == '圆锥') {
+    params.center = [0, 0, 0];
+    params.height = 1;
+    params.direct = [0, 0, 1];
+    params.radius = 1;
+    params.resolution = 150;
+  } else if (modelName == '圆柱体') {
+    params.center = [0, 0, 0];
+    params.height = 1;
+    params.direct = [0, 0, 1];
+    params.radius = 1;
+    params.resolution = 150;
+  } else if (modelName == '球体') {
+    params.center = [0, 0, 0];
+    params.radius = 1;
+    params.resolution = 150;
+  } else {
+    return;
+  }
 
   const actor = vtkActor.newInstance();
   const mapper = vtkMapper.newInstance();
 
   actor.setMapper(mapper);
   mapper.setInputData(data);
+  setPolyData(modelName, params, data);
 
   global.renderer.addActor(actor);
-  console.log(actor);
+  // console.log(actor);
   global.renderWindow.render();
-
-  // 数据存储
-  const uniqueId = new Date().getTime().toString(36);
+  // == 数据存储
+  const uniqueId = getAUniKey()
   const property = actor.getProperty();
   ModelData[uniqueId] = {
     type: 'Model',
@@ -320,17 +410,28 @@ const createModel3 = (modelName) => {
     actor: actor,
     model_type: modelName,
     params: params,
+    data: data,
     volumns: [],
     property: {
       color: property.getColor(),
       opacity: property.getOpacity(),
     },
+    icon: ModelIcon[ModelType[modelName]],
+    parent: parent,
   };
-  console.log(ModelData);
+  // console.log(ModelData);
 
   // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
-  onChange([1, [0], uniqueId, ModelData[uniqueId].name, 'Model']);
+  ModelData[parent].components.push(uniqueId);
+  onChange([1, parent, uniqueId, ModelData[uniqueId].name, 'Model', ModelData[uniqueId].icon]);
+  return uniqueId;
 }
+const removeModel3 = (key) => {
+  if (ModelData[key] != null) {
+    global.renderer.removeActor(ModelData[key].actor);
+  }
+}
+
 const showAxes = () => {
 
 }

@@ -25,7 +25,7 @@ const findNode = (key) => {
 }
 const controlTreeNode = (mode, val) => {
     if (mode == 0) {
-        console.log(ModelPropertyInfo.value.key, val);
+        // console.log(ModelPropertyInfo.value.key, val);
         findNode(ModelPropertyInfo.value.key)[val[0]] = val[1];
     }
 }
@@ -44,14 +44,14 @@ const onSelect = (selectedKeys, info) => {
 const ModelPropertyInfo = ref({
 });
 EventBus.on('component-node-queryRes', (val) => {
-    console.log("component-node-queryRes", val);
+    // console.log("component-node-queryRes", val);
     ModelPropertyInfo.value = val;
     // ModelPropertyInfo.value.name = "2131"
 })
 const ExpandKey = ref([]);
 // 接收信息 对组件控制器的修改信息
 EventBus.on('dataStructChange', (val) => {
-    console.log("dataStructChange:", val);
+    // console.log("dataStructChange:", val);
     switch (val[0]) {
         // 初始化
         case 0:
@@ -59,25 +59,48 @@ EventBus.on('dataStructChange', (val) => {
             break;
         // 新增
         case 1:
-            let node = treeData.value;
-            let eky;
-            for (let i = 0; i < val[1].length; i++) {
-                eky = node[val[1][i]].key;
-                node = node[val[1][i]].children;
-            }
-            node.push({
+            let node = findNode(val[1])
+
+            if (!('children' in node))
+                node.children = [];
+            node.children.push({
                 title: val[3],
                 key: val[2],
-                type: val[4]
+                type: val[4],
+                icon: val[5],
+                parent: val[1],
             })
-            ExpandKey.value.push(eky)
+            ExpandKey.value.push(val[1])
             break;
         default:
             break;
     }
 })
+//
+const addComponent = (dataRef, modeIndex, modelIndex = 0) => {
+    // console.log('add file', dataRef, modeIndex, modelIndex);
+    //  发送请求，根据回执添加在 treeData
+    EventBus.emit("component-add-query", [dataRef.key, modeIndex, modelIndex]);
+};
+const removeComponent = (key) => {
+    // console.log('remove file', key);
+    const parentKey = findNode(key).parent;
+    if(parentKey){
+        //  发送请求，根据回执添加在 treeData
+        EventBus.emit("component-remove-query", key);
 
-const activeKey = ref([]);
+        const ParentNode = findNode(parentKey);
+        for(let i =0;i<ParentNode.children.length;i++){
+            if(ParentNode.children[i].key == key){
+                ParentNode.children.splice(i, 1);
+                break;
+            }
+        }
+    }
+};
+//
+const activeKey = ref([2]);
+const CenterStep = ref("0.01");
 </script>
 <template>
     <div class="left_container">
@@ -90,13 +113,56 @@ const activeKey = ref([]);
             <div style="flex: 1;overflow: auto;">
                 <a-tree :show-line="true" :show-icon="showIcon" :tree-data="treeData" v-model:expandedKeys="ExpandKey"
                     @select="onSelect">
-                    <!-- <template #icon><carry-out-outlined /></template> -->
                     <template #title="{ dataRef }">
                         <!-- <template v-if="dataRef.key === '0-0-0-1'">
                             <div>multiple line title</div>
                             <div>multiple line title</div>
                         </template> -->
-                        {{ dataRef.title }}
+
+                        <div style="display: flex; gap: 10px; height: 32px; align-items: center;">
+                            <span style="line-height: 32px;" :class="'iconfont ' + dataRef.icon">
+                                {{ " " + dataRef.title }}
+                            </span>
+                            <a-button-group>
+                                <a-dropdown v-if="dataRef.type != 'Model'">
+                                    <template #overlay>
+                                        <a-menu>
+                                            <a-menu-item key="1" @click="addComponent(dataRef, 2)">
+                                                <span class="iconfont icon-bujian">&nbsp;组件</span>
+                                            </a-menu-item>
+                                            <a-menu-item key="2">
+                                                <a-dropdown v-if="dataRef.type != 'Model'">
+                                                    <template #overlay>
+                                                        <a-menu>
+                                                            <a-menu-item key="2-1" @click="addComponent(dataRef, 1, 0)">
+                                                                <span class="iconfont icon-m_ac_set">&nbsp;立方体</span>
+                                                            </a-menu-item>
+                                                            <a-menu-item key="2-2" @click="addComponent(dataRef, 1, 1)">
+                                                                <span class="iconfont icon-yuanzhuiti">&nbsp;圆锥</span>
+                                                            </a-menu-item>
+                                                            <a-menu-item key="2-3" @click="addComponent(dataRef, 1, 2)">
+                                                                <span class="iconfont icon-cylinder">&nbsp;圆柱体</span>
+                                                            </a-menu-item>
+                                                            <a-menu-item key="2-4" @click="addComponent(dataRef, 1, 3)">
+                                                                <span class="iconfont icon-fi-sr-sphere">&nbsp;球体</span>
+                                                            </a-menu-item>
+                                                        </a-menu>
+                                                    </template>
+                                                    <span class="iconfont icon-m_ac_set">&nbsp;模型&nbsp;<i
+                                                            class="iconfont icon-jiantouxia"></i></span>
+                                                </a-dropdown>
+                                            </a-menu-item>
+                                        </a-menu>
+                                    </template>
+                                    <a-button @click.stop="" style="height: 24px;padding:0 7px;line-height: 22px;">
+                                        +
+                                    </a-button>
+                                </a-dropdown>
+
+                                <a-button @click.stop="removeComponent(dataRef.key);" style="height: 24px;padding:0 7px;line-height: 22px;" danger
+                                    type="primary">-</a-button>
+                            </a-button-group>
+                        </div>
                     </template>
                 </a-tree>
             </div>
@@ -112,30 +178,29 @@ const activeKey = ref([]);
                 <span style="padding-left: 10px; line-height: 32px;">类别:</span>
                 <span style="line-height: 32px;">{{ ModelPropertyInfo.type }}</span>
                 <span style="padding-left: 20px; line-height: 32px;">模型类别:</span>
-                <span style="line-height: 32px;">{{ ModelPropertyInfo.model_type }}</span>
+                <span :class="'iconfont ' + ModelPropertyInfo.icon" style="line-height: 32px;">{{
+                    ModelPropertyInfo.model_type
+                    }}</span>
             </div>
             <a-collapse v-model:activeKey="activeKey" accordion>
-                <a-collapse-panel key="1" header="属性" v-if="'property' in ModelPropertyInfo">
-
-
-
-
+                <a-collapse-panel key="1" header="属性"
+                    v-if="ModelPropertyInfo.type == 'Model' && 'property' in ModelPropertyInfo">
                     <a-list size="small">
                         <a-list-item>颜色：
                             <a-row>
                                 <a-col :span="7">
                                     <a-input-number v-model:value="ModelPropertyInfo.property.color[0]"
-                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.001"
+                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.01"
                                         @change="InfoChanged('color')" />
                                 </a-col>
                                 <a-col :span="7">
                                     <a-input-number v-model:value="ModelPropertyInfo.property.color[1]"
-                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.001"
+                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.01"
                                         @change="InfoChanged('color')" />
                                 </a-col>
                                 <a-col :span="7">
                                     <a-input-number v-model:value="ModelPropertyInfo.property.color[2]"
-                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.001"
+                                        style="margin-left: 16px;width: 70px;" :min="0" :max="1" :step="0.01"
                                         @change="InfoChanged('color')" />
                                 </a-col>
                             </a-row>
@@ -153,11 +218,81 @@ const activeKey = ref([]);
                             </a-row>
                         </a-list-item>
                     </a-list>
-
-
-
                 </a-collapse-panel>
-                <a-collapse-panel key="2" header="参数">
+                <a-collapse-panel key="2" header="参数"
+                    v-if="ModelPropertyInfo.type == 'Model' && 'params' in ModelPropertyInfo">
+                    <a-list size="small">
+                        <a-list-item>位置：
+                            <a-select ref="select" v-model:value="CenterStep" style="width: 120px;">
+                                <a-select-option value="0.01">0.01</a-select-option>
+                                <a-select-option value="0.1">0.1</a-select-option>
+                                <a-select-option value="1">1</a-select-option>
+                            </a-select>
+                            <a-row>
+                                <a-col :span="8">
+                                    <a-input-number v-model:value="ModelPropertyInfo.params.center[0]"
+                                        style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
+                                        @change="InfoChanged('params')" />
+                                </a-col>
+                                <a-col :span="8">
+                                    <a-input-number v-model:value="ModelPropertyInfo.params.center[1]"
+                                        style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
+                                        @change="InfoChanged('params')" />
+                                </a-col>
+                                <a-col :span="8">
+                                    <a-input-number v-model:value="ModelPropertyInfo.params.center[2]"
+                                        style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
+                                        @change="InfoChanged('params')" />
+                                </a-col>
+                            </a-row>
+                        </a-list-item>
+                        <a-list-item v-if="'resolution' in ModelPropertyInfo.params">分辨率：
+                            <a-row>
+                                <a-col :span="12">
+                                    <a-slider v-model:value="ModelPropertyInfo.params.resolution" :min="0" :max="300"
+                                        :step="1" style="margin-left: 16px" @change="InfoChanged('params')" />
+                                </a-col>
+                                <a-col :span="4">
+                                    <a-input-number v-model:value="ModelPropertyInfo.params.resolution" :min="0"
+                                        :max="300" :step="1" style="margin-left: 16px"
+                                        @change="InfoChanged('params')" />
+                                </a-col>
+                            </a-row>
+                        </a-list-item>
+                        <a-list-item>模型参数：
+                            <a-form-item label="半径" v-if="'radius' in ModelPropertyInfo.params"
+                                style="margin-left: 14px;">
+                                <a-input-number v-model:value="ModelPropertyInfo.params.radius" :min="0" :step="0.01"
+                                    style="margin-left: 16px" @change="InfoChanged('params')" />
+                            </a-form-item>
+                            <a-form-item label="高度" v-if="'height' in ModelPropertyInfo.params"
+                                style="margin-left: 14px;">
+                                <a-input-number v-model:value="ModelPropertyInfo.params.height" :step="0.01"
+                                    style="margin-left: 16px" @change="InfoChanged('params')" />
+                            </a-form-item>
+                            <a-form-item label="朝向" v-if="'direct' in ModelPropertyInfo.params"
+                                style="margin-left: 14px;">
+                                <a-input-number v-model:value="ModelPropertyInfo.params.direct[0]" :step="0.01"
+                                    :min="-1" :max="1" style="width: 57px; margin-left: 5px"
+                                    @change="InfoChanged('params')" />
+                                <a-input-number v-model:value="ModelPropertyInfo.params.direct[1]" :step="0.01"
+                                    :min="-1" :max="1" style="width: 57px; margin-left: 5px"
+                                    @change="InfoChanged('params')" />
+                                <a-input-number v-model:value="ModelPropertyInfo.params.direct[2]" :step="0.01"
+                                    :min="-1" :max="1" style="width: 57px; margin-left: 5px"
+                                    @change="InfoChanged('params')" />
+                            </a-form-item>
+                            <a-form-item label="边长" v-if="'XLen' in ModelPropertyInfo.params"
+                                style="margin-left: 14px;">
+                                <a-input-number v-model:value="ModelPropertyInfo.params.XLen" :step="0.01"
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
+                                <a-input-number v-model:value="ModelPropertyInfo.params.YLen" :step="0.01"
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
+                                <a-input-number v-model:value="ModelPropertyInfo.params.ZLen" :step="0.01"
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
+                            </a-form-item>
+                        </a-list-item>
+                    </a-list>
                 </a-collapse-panel>
                 <a-collapse-panel key="3" header="特征">
                 </a-collapse-panel>
@@ -181,6 +316,7 @@ section {
     background-color: #fff;
     border: 1px solid #aaa;
     width: 100%;
+    min-height: 100px;
     overflow: auto;
 }
 
