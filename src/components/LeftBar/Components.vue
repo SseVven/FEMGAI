@@ -317,6 +317,7 @@ section {
     border: 1px solid #aaa;
     width: 100%;
     min-height: 100px;
+    padding: 7px;
     overflow: auto;
 }
 

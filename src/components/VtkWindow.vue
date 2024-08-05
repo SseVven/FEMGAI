@@ -14,6 +14,7 @@ import '@kitware/vtk.js/Rendering/Profiles/Geometry';
 import vtkFullScreenRenderWindow from '@kitware/vtk.js/Rendering/Misc/FullScreenRenderWindow';
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
+import vtkLight from '@kitware/vtk.js/Rendering/Core/Light';
 
 // import controlPanel from './controlPanel.html';
 import EventBus from '@/assets/common/event-bus';
@@ -156,10 +157,10 @@ EventBus.on('component-add-query', (val) => {
   onChange([1, data.key, model.key, model.name, model.type, model.icon]);
 })
 EventBus.on('component-remove-query', (val) => {
-  const data = ModelData[ModelData[val].parent];
+  const data = ModelData[val];
   // console.log("component-remove-query", val, data, DataStruct, ModelData);
   // 找到父节点然后删掉 or 遍历移除掉 data 的components 的actor
-  const myque = [...data.components];
+  const myque = [data.key];
   while (myque.length > 0) {
     const node = ModelData[myque[0]];
     myque.shift();
@@ -176,7 +177,7 @@ EventBus.on('component-remove-query', (val) => {
 
 //定义api
 // ================================================================================ cameracontrol
-const cameraControl = (mode, params) => {
+const cameraControl = async (mode, params) => {
   // 固定视角
   if (mode === 0) {
     // console.log("mode:0");
@@ -194,15 +195,53 @@ const cameraControl = (mode, params) => {
   }
   // 移动视角
   else if (mode === 2) {
-    console.log("mode:2");
+    console.log("mode:2", mode, params);
+    // 延时旋转相机位置
+    global.camera.setViewUp(params.ViewUp[0], params.ViewUp[1], params.ViewUp[2])
+    global.camera.setViewAngle(params.ViewAngle)
+    let prePoint = [...params.Position];
+    if (params.Times.length == 1) {
+      for (let i = 0; i < params.MidPoses.length; i++) {
+        const point = params.MidPoses[i];
+        const pNum = params.Times[0] * 100;
+        const interval = [(point[0] - prePoint[0]) / pNum, (point[1] - prePoint[1]) / pNum, (point[2] - prePoint[2]) / pNum]
+
+        console.log(prePoint, point, interval);
+        for (let j = 1; j <= pNum; j++) {
+          await new Promise((resolve, reject) => {
+            setTimeout(() => {
+              resolve();
+              global.camera.setPosition(prePoint[0] + interval[0] * j, prePoint[1] + interval[1] * j, prePoint[2] + interval[2] * j);
+              global.renderer.resetCamera();
+              global.renderWindow.render();
+            }, params.Times[0] * 10);
+          });
+        }
+
+        prePoint = [...point];
+      }
+    } else {
+
+    }
   }
   // global.renderer.resetCamera();
   global.renderWindow.render();
-}
+  PreCameraControl = 0;
+  console.log("DONE32131312");
+};
 // 接收信息
+let PreCameraControl = 0;
 EventBus.on('camera-choose', (val) => {
-  // console.log("'camera-choose get:'", val);
-  cameraControl(val[0], val[1]);
+  if (val)
+    if (PreCameraControl == 0) {
+      console.log("'camera-choose get:'", val);
+      PreCameraControl = 1;
+      cameraControl(val[0], val[1]);
+    }
+    else {
+      //   // 打断上一个相机控制  然后再执行新的相机控制
+
+    }
 })
 // 传递相机参数
 const sendCamerainfo = () => {
@@ -214,7 +253,67 @@ const sendCamerainfo = () => {
     ClippingRange: global.camera.getClippingRange(),
   })
 }
-// ================================================================================ cameracontrol end
+// ================================================================================ camera control end
+// ================================================================================ light control
+const MyLights = {
+}
+const logLightsInfo = () => {
+  const data = global.renderer.getLights();
+  console.log("ALL lights:(" + data.length + ")");
+
+  for (let i = 0; i < data.length; i++) {
+    const light = data[i];
+    const res = {
+      lightType: light.getLightType(),
+      position: light.getPosition(),
+      focalPoint: light.getFocalPoint(),
+      direction: light.getDirection(),
+      color: light.getColor(),
+      intensity: light.getIntensity(),
+      coneAngle: light.getConeAngle(),
+      coneFalloff: light.getConeFalloff(),
+      exponent: light.getExponent(),
+    }
+
+    console.log(res);
+  }
+}
+const addLight = (renderer, paramsOrLight, mode = 0) => {
+  if (mode == 1) {
+    renderer.addLight(paramsOrLight);
+    console.log("addLight success: ", paramsOrLight);
+    return;
+  }
+  const light = vtkLight.newInstance({
+    switch: true,
+    intensity: 1,
+    color: paramsOrLight.color || [0, 1, 1]
+  })
+
+  renderer.addLight(light);
+  console.log("addLight success: ", light);
+}
+EventBus.on('light-choose', (val) => {
+  console.log('light-choose', val);
+  let light;
+  if (MyLights[val.key]) {
+    light = MyLights[val.key];
+  } else {
+    light = vtkLight.newInstance();
+    MyLights[val.key] = light;
+  }
+
+  light.setSwitch(val.Switch);
+  light.setColor(val.Color);
+  light.setPosition(val.Position[0], val.Position[1], val.Position[2]);
+  light.setConeAngle(val.ViewAngle);
+
+  global.renderer.addLight(light);
+  global.renderWindow.render();
+  logLightsInfo();
+})
+// ================================================================================ light end
+
 // 输入三维向量，输出任一垂直单位向量
 function getPerpendicularUnitVector(v) {
   // Destructure the input vector
@@ -435,10 +534,18 @@ const removeModel3 = (key) => {
 const showAxes = () => {
 
 }
-//
+// navBar toolBtn
 EventBus.on('tool-click', (val) => {
   console.log("vtkWindow", val);
   switch (val[0]) {
+    case '标准':
+      switch (val[1]) {
+        case '打开':
+          break;
+        case '保存':
+          break;
+      }
+      break;
     case '模型':
       createModel3(val[1]);
       break;
@@ -484,6 +591,9 @@ onMounted(() => {
   global.renderer.resetCamera();
   global.renderWindow.render();
   sendCamerainfo();
+
+
+  logLightsInfo();
 });
 defineExpose({
   fullScreenRenderer,
