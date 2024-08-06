@@ -377,8 +377,11 @@ const setPolyData = (type, params, data) => {
   let points = [];
   let faces = [];
   if (type == '立方体') {
-    points = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
-    faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+    points = [[0, 0, 0], [params.XLen, 0, 0], [0, 0, params.ZLen], [params.XLen, 0, params.ZLen], [0, params.YLen, 0], [params.XLen, params.YLen, 0], [0, params.YLen, params.ZLen], [params.XLen, params.YLen, params.ZLen]];
+    for (let i = 0; i < 8; i++)
+      for (let j = 0; j < 3; j++)
+        points[i][j] += params.center[j];
+    faces = [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [2, 3, 7, 6], [2, 0, 4, 6]];
   } else if (type == '圆锥') {
     const APoint = [params.direct[0] * params.height, params.direct[1] * params.height, params.direct[2] * params.height];
     const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
@@ -470,20 +473,20 @@ const createModel3 = (modelName, parent = DataStruct[0].key) => {
     params.YLen = 1;
     params.ZLen = 1;
   } else if (modelName == '圆锥') {
-    params.center = [0, 0, 0];
-    params.height = 1;
-    params.direct = [0, 0, 1];
     params.radius = 1;
+    params.height = 1;
     params.resolution = 150;
+    params.center = [0, 0, 0];
+    params.direct = [0, 0, 1];
   } else if (modelName == '圆柱体') {
-    params.center = [0, 0, 0];
+    params.radius = 1;
     params.height = 1;
-    params.direct = [0, 0, 1];
-    params.radius = 1;
     params.resolution = 150;
-  } else if (modelName == '球体') {
     params.center = [0, 0, 0];
+    params.direct = [0, 0, 1];
+  } else if (modelName == '球体') {
     params.radius = 1;
+    params.center = [0, 0, 0];
     params.resolution = 150;
   } else {
     return;
@@ -534,13 +537,14 @@ const removeModel3 = (key) => {
 const showAxes = () => {
 
 }
-// navBar toolBtn
+// ================================================================================ navBar toolBtn
 EventBus.on('tool-click', (val) => {
   console.log("vtkWindow", val);
   switch (val[0]) {
     case '标准':
       switch (val[1]) {
         case '打开':
+
           break;
         case '保存':
           break;

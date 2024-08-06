@@ -12,8 +12,10 @@
   "dependencies": {
     "@kitware/vtk.js": "^31.0.3",
     "ant-design-vue": "^4.2.3",
+    "axios": "^1.7.3",
     "bootstrap": "^5.3.0-alpha1",
     "mitt": "^3.0.1",
+    "mockjs": "^1.1.0",
     "vue": "^3.4.29"
   },
   "devDependencies": {
