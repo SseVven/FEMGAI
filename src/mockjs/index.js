@@ -1,6 +1,6 @@
 // 引用 Mock
 import Mock from 'mockjs'
- 
+
 export const userData = Mock.mock("/data/list", "get", {
   // 属性 list 的值是一个数组，随机生成 1 到 10 个元素
   "list|1-10": [
@@ -37,6 +37,15 @@ export const userData = Mock.mock("/data/list", "get", {
       'regexp': /\d{5,10}/,
     },
   ],
+  code: 200,
+  message: 'ok',
+});
+
+export const openFile = Mock.mock("/File/Open", "get", {
+  // 属性 list 的值是一个数组，随机生成 1 到 10 个元素
+  "res": {
+    msg: "dsaddasdas",
+  },
   code: 200,
   message: 'ok',
 });

@@ -15,15 +15,25 @@ import vtkFullScreenRenderWindow from '@kitware/vtk.js/Rendering/Misc/FullScreen
 import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 import vtkLight from '@kitware/vtk.js/Rendering/Core/Light';
+import vtkPicker from '@kitware/vtk.js/Rendering/Core/Picker'
 
 // import controlPanel from './controlPanel.html';
 import EventBus from '@/assets/common/event-bus';
+import { math } from '@/assets/common/math';
+import axios from 'axios'
+// import api from '@/assets/common/request.js'
+
 import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
 import vtkOrientationMarkerWidget from '@kitware/vtk.js/Interaction/Widgets/OrientationMarkerWidget';
 
 import vtkCellArray from '@kitware/vtk.js/Common/Core/CellArray';
 import vtkPoints from '@kitware/vtk.js/Common/Core/Points';
 import vtkPolyData from '@kitware/vtk.js/Common/DataModel/PolyData';
+
+// import vtkVolume from '@kitware/vtk.js/Rendering/Core/Volume';
+// import vtkColorTransferFunction from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction';
+// import vtkHttpDataSetReader from '@kitware/vtk.js/IO/Core/HttpDataSetReader';
+// import vtkVolumeMapper from '@kitware/vtk.js/Rendering/Core/VolumeMapper';
 
 
 let fullScreenRenderer = ref(null);
@@ -45,21 +55,28 @@ const FileIcon = [
   "icon-bujian"
 ]
 const ModelType = {
+  "立方体": 0x1,
+  "圆锥": 0x2,
+  "圆柱体": 0x4,
+  "球体": 0x8,
+  "布尔体": 0x10,
+}
+const ModelTypeIndex = {
   "立方体": 0,
   "圆锥": 1,
   "圆柱体": 2,
   "球体": 3,
-  "复合体": 4,
+  "布尔体": 4,
 }
 const ModelName = [
-  "立方体", "圆锥", "圆柱体", "球体", "复合体"
+  "立方体", "圆锥", "圆柱体", "球体", "布尔体"
 ]
 const ModelIcon = [
   "icon-m_ac_set",
   "icon-yuanzhuiti",
   "icon-cylinder",
   "icon-fi-sr-sphere",
-  "icon-Save",
+  "icon-bueryunsuan",
 ]
 const ModelData = {
   /*
@@ -74,7 +91,8 @@ const ModelData = {
     "components": Array，
     “data": polydata,
     "icon": String,
-    "parent": String
+    "parent": String,
+    "voxelModel": VoxelModel
   }
   */
 }
@@ -100,6 +118,378 @@ ModelData[getAKey] = {
   icon: FileIcon[0],
   parent: null
 };
+// voxel modeling
+class Voxel {
+  constructor() {
+  }
+  static Precision = () => 0.05; // 1cm
+}
+class VoxelModel {
+  constructor(type, params) {
+    this.type = type;
+    this.center = [0, 0, 0];
+    this.resetParams(params);
+  }
+  resetParams(params) {
+    this.voxelData = {};
+    this.points = [];
+    this.faces = [];
+    const precision = Voxel.Precision();
+    const halfPrecision = math.divide(precision, 2);
+    this.precision = precision;
+    this.halfPrecision = halfPrecision;
+    if (this.type == 'default') {
+      for (let i = 0; i < params.length; i++) {
+        const pos = params[i];
+
+        if (!(pos[0] in this.voxelData)) {
+          this.voxelData[pos[0]] = {};
+        }
+        if (!(pos[1] in this.voxelData[pos[0]])) {
+          this.voxelData[pos[0]][pos[1]] = {};
+        }
+        this.voxelData[pos[0]][pos[1]][pos[2]] = true;
+      }
+    }
+    else if (this.type == '立方体') {
+      for (let i = halfPrecision; i < params.XLen; i = math.add(i, precision)) {
+        this.voxelData[i] = {};
+        const iAdd = math.add(i, precision);
+        const iFirst = i == halfPrecision;
+        for (let j = halfPrecision; j < params.YLen; j = math.add(j, precision)) {
+          this.voxelData[i][j] = {};
+          const jAdd = math.add(j, precision);
+          const jFirst = j == halfPrecision;
+          for (let k = halfPrecision; k < params.ZLen; k = math.add(k, precision)) {
+            const out = [iFirst,//L
+              k == halfPrecision, // B
+              iAdd >= params.XLen, //R
+              math.add(k, precision) >= params.ZLen, // F
+              jAdd >= params.YLen, // U
+              jFirst]; // D
+            this.voxelData[i][j][k] = out;
+          }
+        }
+      }
+    }
+    else if (this.type == '圆锥') {
+      for (let i = halfPrecision; i < params.height; i = math.add(i, precision)) {
+        this.voxelData[i] = {};
+        const YLimit = params.radius * (1 - i / params.height);
+        const powYLimit = Math.pow(YLimit, 2);
+        const iFirst = i == halfPrecision;
+        const iAdd = Math.pow(params.radius * (1 - (i + precision) / params.height), 2);
+        for (let j = halfPrecision; j < YLimit; j = math.add(j, precision)) {
+          this.voxelData[i][j] = {};
+          this.voxelData[i][-j] = {};
+          const powJ = j * j;
+          const ZLimit = Math.sqrt(powYLimit - powJ);
+          const jAdd = Math.pow(j + precision, 2);
+          for (let k = halfPrecision; k < ZLimit; k = math.add(k, precision)) {
+            const out = [iFirst,//L
+              jAdd + k * k >= powYLimit, // U
+              k + precision >= ZLimit, //F
+              powJ + k * k >= iAdd] // R
+
+            this.voxelData[i][j][k] = [out[0], false, out[3], out[2], out[1], false];
+            this.voxelData[i][j][-k] = [out[0], out[2], out[3], false, out[1], false];
+            this.voxelData[i][-j][k] = [out[0], false, out[3], out[2], false, out[1]];
+            this.voxelData[i][-j][-k] = [out[0], out[2], out[3], false, false, out[1]];
+          }
+        }
+      }
+    }
+    else if (this.type == '圆柱体') {
+      const powRadius = Math.pow(params.radius, 2);
+      for (let i = halfPrecision; i < params.height; i = math.add(i, precision)) {
+        this.voxelData[i] = {};
+        const iFirst = i == halfPrecision;
+        const iAdd = i + precision;
+        for (let j = halfPrecision; j < params.radius; j = math.add(j, precision)) {
+          this.voxelData[i][j] = {};
+          this.voxelData[i][-j] = {};
+          const ZLimit = Math.sqrt(Math.pow(params.radius, 2) - j * j);
+          const JAdd = Math.pow(j + precision, 2);
+          for (let k = halfPrecision; k < ZLimit; k = math.add(k, precision)) {
+            const out = [iFirst,//L
+              JAdd + k * k >= powRadius, // U
+              k + precision >= ZLimit, //F
+              iAdd >= params.height] // R
+
+            this.voxelData[i][j][k] = [out[0], false, out[3], out[2], out[1], false];
+            this.voxelData[i][j][-k] = [out[0], out[2], out[3], false, out[1], false];
+            this.voxelData[i][-j][k] = [out[0], false, out[3], out[2], false, out[1]];
+            this.voxelData[i][-j][-k] = [out[0], out[2], out[3], false, false, out[1]];
+          }
+        }
+      }
+    }
+    else if (this.type == '球体') {
+      const powRadius = Math.pow(params.radius, 2);
+      for (let i = halfPrecision; i < params.radius; i = math.add(i, precision)) {
+        this.voxelData[i] = {};
+        this.voxelData[-i] = {};
+        const powI = i * i;
+        const YLimit = Math.sqrt(powRadius - powI);
+        const powYLimit = Math.pow(YLimit, 2);
+        const IAdd = Math.pow(i + precision, 2);
+        for (let j = halfPrecision; j < YLimit; j = math.add(j, precision)) {
+          this.voxelData[i][j] = {};
+          this.voxelData[i][-j] = {};
+          this.voxelData[-i][j] = {};
+          this.voxelData[-i][-j] = {};
+          const powJ = j * j;
+          const ZLimit = Math.sqrt(powRadius - powI - powJ);
+          const JAdd = Math.pow(j + precision, 2);
+          for (let k = halfPrecision; k < ZLimit; k = math.add(k, precision)) {
+            const powK = k * k;
+            const out = [JAdd + powK >= powYLimit, // U
+            k + precision >= ZLimit, //F
+            IAdd + powK + powJ >= powRadius] // R
+
+            this.voxelData[i][j][k] = [false, false, out[2], out[1], out[0], false];
+            this.voxelData[i][j][-k] = [false, out[1], out[2], false, out[0], false];
+            this.voxelData[i][-j][k] = [false, false, out[2], out[1], false, out[0]];
+            this.voxelData[i][-j][-k] = [false, out[1], out[2], false, false, out[0]];
+            this.voxelData[-i][j][k] = [out[2], false, false, out[1], out[0], false];
+            this.voxelData[-i][j][-k] = [out[2], out[1], false, false, out[0], false];
+            this.voxelData[-i][-j][k] = [out[2], false, false, out[1], false, out[0]];
+            this.voxelData[-i][-j][-k] = [out[2], out[1], false, false, false, out[0]];
+          }
+        }
+      }
+    }
+    else if (this.type == '布尔体') {
+      const boolType = params.boolType;
+      const target = params.target.voxelModel;
+      const tools = [];
+      for (let i = 0; i < params.tools.length; i++)
+        tools.push(params.tools[i].voxelModel.voxelData);
+
+      this.voxelData = target.voxelData;
+      this.center = target.center;
+
+      console.log([boolType, this.voxelData, tools]);
+
+      if (boolType == '交运算') {
+        // 删除与tools不相交的体素点
+        for (let x in this.voxelData) {
+          const dataX = this.voxelData[x];
+          for (let y in dataX) {
+            const dataY = dataX[y];
+            for (let z in dataY) {
+              // 遍历这个点是否在所有tools中都存在
+              let flag = false;
+              for (let i = 0; i < tools.length; i++) {
+                const toolModel = params.tools[i].voxelModel;
+                const point = toolModel.ralativeVoxelPos(this, [x, y, z]);
+
+                if (!toolModel.hasPoint(point)) {
+                  flag = true;
+                  break;
+                }
+              }
+              if (flag) {
+                // del这个点
+                const point = [x, y, z];
+                delete this.voxelData[point[0]][point[1]][point[2]];
+                // 给这个点的邻接点附加边
+                point[0] = math.subtract(point[0], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][2] = true;
+                point[0] = math.add(point[0], precision);
+                point[2] = math.subtract(point[2], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][3] = true;
+                point[2] = math.add(point[2], precision);
+                point[0] = math.add(point[0], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][0] = true;
+                point[0] = math.subtract(point[0], precision);
+                point[2] = math.add(point[2], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][1] = true;
+                point[2] = math.subtract(point[2], precision);
+                point[1] = math.add(point[1], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][5] = true;
+                point[1] = math.subtract(point[1], precision);
+                point[1] = math.subtract(point[1], precision);
+                if (this.hasPoint(point))
+                  this.voxelData[point[0]][point[1]][point[2]][4] = true;
+              }
+            }
+          }
+        }
+      } else if (boolType == '差运算') {
+        // 删除tools相交的体素点
+        for (let i = 0; i < tools.length; i++) {
+          const toolVoxelData = tools[i];
+          const toolModel = params.tools[i].voxelModel;
+          // 遍历删除体素点，判断删除点是不是边界点
+          for (let x in toolVoxelData) {
+            const dataX = toolVoxelData[x];
+            for (let y in dataX) {
+              const dataY = dataX[y];
+              for (let z in dataY) {
+                const point = this.ralativeVoxelPos(toolModel, [x, y, z]);
+                if (this.hasPoint(point)) {
+                  // del这个点
+                  delete this.voxelData[point[0]][point[1]][point[2]];
+                  // 给这个点的邻接点附加边
+                  point[0] = math.subtract(point[0], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][2] = true;
+                  point[0] = math.add(point[0], precision);
+                  point[2] = math.subtract(point[2], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][3] = true;
+                  point[2] = math.add(point[2], precision);
+                  point[0] = math.add(point[0], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][0] = true;
+                  point[0] = math.subtract(point[0], precision);
+                  point[2] = math.add(point[2], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][1] = true;
+                  point[2] = math.subtract(point[2], precision);
+                  point[1] = math.add(point[1], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][5] = true;
+                  point[1] = math.subtract(point[1], precision);
+                  point[1] = math.subtract(point[1], precision);
+                  if (this.hasPoint(point))
+                    this.voxelData[point[0]][point[1]][point[2]][4] = true;
+                }
+              }
+            }
+          }
+        }
+      } else if (boolType == '并运算') {
+        // 添加tools的体素点
+        for (let i = 0; i < tools.length; i++) {
+          const toolVoxelData = tools[i];
+          const toolModel = params.tools[i].voxelModel;
+          // 遍历删除体素点，判断删除点是不是边界点
+          for (let x in toolVoxelData) {
+            const dataX = toolVoxelData[x];
+            for (let y in dataX) {
+              const dataY = dataX[y];
+              for (let z in dataY) {
+                const faces = toolVoxelData[x][y][z];
+                const point = this.ralativeVoxelPos(toolModel, [x, y, z]);
+
+                if (this.hasPoint(point)) {
+                  const tpoint = this.getPoint(point);
+                  for (let j = 0; j < 6; j++) {
+                    tpoint[j] &= faces[j];
+                  }
+                } else
+                  this.addPoint(point, faces);
+              }
+            }
+          }
+        }
+      }
+    }
+    this.setPointsFacesByVoxelData();
+  }
+  addPoints(center) {
+    const halfPrecision = this.halfPrecision;
+    const i = center[0];
+    const j = center[1];
+    const k = center[2];
+    this.points.push([i - halfPrecision, j - halfPrecision, k - halfPrecision]);
+    this.points.push([i + halfPrecision, j - halfPrecision, k - halfPrecision]);
+    this.points.push([i + halfPrecision, j + halfPrecision, k - halfPrecision]);
+    this.points.push([i - halfPrecision, j + halfPrecision, k - halfPrecision]);
+    this.points.push([i - halfPrecision, j - halfPrecision, k + halfPrecision]);
+    this.points.push([i + halfPrecision, j - halfPrecision, k + halfPrecision]);
+    this.points.push([i + halfPrecision, j + halfPrecision, k + halfPrecision]);
+    this.points.push([i - halfPrecision, j + halfPrecision, k + halfPrecision]);
+  }
+  addFace(direct, add) {
+    switch (direct) {
+      case 0:
+      case 'L':
+        this.faces.push([4 + add, 7 + add, 3 + add, 0 + add]);
+        break;
+      case 1:
+      case 'B':
+        this.faces.push([0 + add, 1 + add, 2 + add, 3 + add]);
+        break;
+      case 2:
+      case 'R':
+        this.faces.push([1 + add, 2 + add, 6 + add, 5 + add]);
+        break;
+      case 3:
+      case 'F':
+        this.faces.push([4 + add, 5 + add, 6 + add, 7 + add]);
+        break;
+      case 4:
+      case 'U':
+        this.faces.push([7 + add, 6 + add, 2 + add, 3 + add]);
+        break;
+      case 5:
+      case 'D':
+        this.faces.push([4 + add, 5 + add, 1 + add, 0 + add]);
+        break;
+      default:
+        break;
+    }
+  }
+  setPointsFacesByVoxelData() {
+    for (let x in this.voxelData) {
+      const dataX = this.voxelData[x];
+      for (let y in dataX) {
+        const dataY = dataX[y];
+        for (let z in dataY) {
+          const point = [parseFloat(x), parseFloat(y), parseFloat(z)];
+          const faceStatus = dataY[z];
+
+          const add = this.points.length;
+          let cnt = 0;
+          for (let i = 0; i < 6; i++) {
+            // console.log(faceStatus);
+
+            if (faceStatus[i]) {
+              this.addFace(i, add);
+              cnt++;
+            }
+          }
+          if (cnt)
+            this.addPoints(point);
+        }
+      }
+    }
+  }
+  ralativeVoxelPos(VoxelModel, pos) {
+    const tmp = [...pos];
+    for (let i = 0; i < 3; i++)
+      tmp[i] = math.subtract(math.add(pos[i], VoxelModel.center[i]), this.center[i]);
+    return tmp;
+  }
+  hasPoint(pos) {
+    let tmp = this.voxelData;
+    for (let i = 0; i < 3; i++) {
+      if (!(pos[i] in tmp))
+        return false;
+      tmp = tmp[pos[i]];
+    }
+    return true;
+  }
+  addPoint(pos, val) {
+    if (!(pos[0] in this.voxelData))
+      this.voxelData[pos[0]] = {};
+    if (!(pos[1] in this.voxelData[pos[0]]))
+      this.voxelData[pos[0]][pos[1]] = {};
+    this.voxelData[pos[0]][pos[1]][pos[2]] = val;
+  }
+  getPoint(pos) {
+    return this.voxelData[pos[0]][pos[1]][pos[2]];
+  }
+}
+
 // 组件控制器 修改
 const onChange = (val) => {
   EventBus.emit("dataStructChange", val);
@@ -112,13 +502,18 @@ EventBus.on('component-node-query', (val) => {
 })
 // info changed
 EventBus.on('Property-changed', (val) => {
-  // console.log("Property-changed", val);
+  console.log("Property-changed", val);
   if (val[1] == 'color')
     ModelData[val[0]].actor.getProperty().setColor(ModelData[val[0]].property.color)
   else if (val[1] == 'opacity')
     ModelData[val[0]].actor.getProperty().setOpacity(ModelData[val[0]].property.opacity)
   else if (val[1] == 'params') {
     setPolyData(ModelData[val[0]].model_type, ModelData[val[0]].params, ModelData[val[0]].data);
+  } else if (val[1] == 'voxelModel') {
+    setPolyData('体素', ModelData[val[0]].voxelModel, ModelData[val[0]].data);
+  } else if (val[1] == 'voxelModelparams') {
+    ModelData[val[0]].voxelModel.resetParams(ModelData[val[0]].params);
+    setPolyData('体素', ModelData[val[0]].voxelModel, ModelData[val[0]].data);
   }
   global.renderWindow.render();
 })
@@ -372,16 +767,59 @@ function rotateVectorAroundAxis(a, b, deg) {
 
   return [rotatedX, rotatedY, rotatedZ];
 }
+// 计算体素点
+const getVoxelInfo = () => {
+
+}
 //
+const getDefaultParams = (type) => {
+  const params = {};
+  if (type == '立方体') {
+    params.center = [0, 0, 0];
+    params.XLen = 1;
+    params.YLen = 1;
+    params.ZLen = 1;
+  } else if (type == '圆锥') {
+    params.radius = 1;
+    params.height = 1;
+    params.resolution = 150;
+    params.center = [0, 0, 0];
+    params.direct = [0, 0, 1];
+  } else if (type == '圆柱体') {
+    params.radius = 1;
+    params.height = 1;
+    params.resolution = 150;
+    params.center = [0, 0, 0];
+    params.direct = [0, 0, 1];
+  } else if (type == '球体') {
+    params.radius = 1;
+    params.center = [0, 0, 0];
+    params.resolution = 150;
+  } else {
+    return;
+  }
+  return params;
+}
 const setPolyData = (type, params, data) => {
   let points = [];
   let faces = [];
-  if (type == '立方体') {
+  if (type == '体素') {
+    for (let i = 0; i < params.points.length; i++) {
+      let tmp = [];
+      for (let j = 0; j < 3; j++) {
+        tmp.push(params.points[i][j] + params.center[j]);
+      }
+      points.push(tmp);
+    }
+    faces = params.faces;
+  }
+  else if (type == '立方体') {
     points = [[0, 0, 0], [params.XLen, 0, 0], [0, 0, params.ZLen], [params.XLen, 0, params.ZLen], [0, params.YLen, 0], [params.XLen, params.YLen, 0], [0, params.YLen, params.ZLen], [params.XLen, params.YLen, params.ZLen]];
     for (let i = 0; i < 8; i++)
       for (let j = 0; j < 3; j++)
         points[i][j] += params.center[j];
     faces = [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [2, 3, 7, 6], [2, 0, 4, 6]];
+
   } else if (type == '圆锥') {
     const APoint = [params.direct[0] * params.height, params.direct[1] * params.height, params.direct[2] * params.height];
     const CPoint = getPerpendicularUnitVector(params.direct).map(component => component * params.radius);
@@ -464,95 +902,154 @@ const setPolyData = (type, params, data) => {
   data.setPoints(vtkPs);
   data.setPolys(polys);
 }
-const createModel3 = (modelName, parent = DataStruct[0].key) => {
-  const data = vtkPolyData.newInstance();
-  const params = {};
-  if (modelName == '立方体') {
-    params.center = [0, 0, 0];
-    params.XLen = 1;
-    params.YLen = 1;
-    params.ZLen = 1;
-  } else if (modelName == '圆锥') {
-    params.radius = 1;
-    params.height = 1;
-    params.resolution = 150;
-    params.center = [0, 0, 0];
-    params.direct = [0, 0, 1];
-  } else if (modelName == '圆柱体') {
-    params.radius = 1;
-    params.height = 1;
-    params.resolution = 150;
-    params.center = [0, 0, 0];
-    params.direct = [0, 0, 1];
-  } else if (modelName == '球体') {
-    params.radius = 1;
-    params.center = [0, 0, 0];
-    params.resolution = 150;
-  } else {
-    return;
-  }
-
+const createActor = (type, params = {}, data = null) => {
+  const m_data = data || vtkPolyData.newInstance();
   const actor = vtkActor.newInstance();
-  const mapper = vtkMapper.newInstance();
+  setPolyData(type, params, m_data);
 
+  const mapper = vtkMapper.newInstance();
   actor.setMapper(mapper);
-  mapper.setInputData(data);
-  setPolyData(modelName, params, data);
+  mapper.setInputData(m_data);
 
   global.renderer.addActor(actor);
-  // console.log(actor);
   global.renderWindow.render();
-  // == 数据存储
-  const uniqueId = getAUniKey()
-  const property = actor.getProperty();
-  ModelData[uniqueId] = {
-    type: 'Model',
-    key: uniqueId,
-    name: modelName + "-" + uniqueId,
-    actor: actor,
-    model_type: modelName,
-    params: params,
-    data: data,
-    volumns: [],
-    property: {
-      color: property.getColor(),
-      opacity: property.getOpacity(),
-    },
-    icon: ModelIcon[ModelType[modelName]],
-    parent: parent,
-  };
-  // console.log(ModelData);
 
-  // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
-  ModelData[parent].components.push(uniqueId);
-  onChange([1, parent, uniqueId, ModelData[uniqueId].name, 'Model', ModelData[uniqueId].icon]);
-  return uniqueId;
+  return actor;
+}
+const createModel3 = (modelName, parent = DataStruct[0].key, fParams = null) => {
+  const data = vtkPolyData.newInstance();
+  const params = fParams || getDefaultParams(modelName);
+
+  axios.post('/api/echo', {
+    type: ModelType[modelName],
+    params: params
+  })
+    .then(res => {
+      const voxelModel = new VoxelModel(modelName, params);
+
+      const actor = createActor('体素', voxelModel, data);
+
+      // == 数据存储
+      const uniqueId = getAUniKey()
+      const property = actor.getProperty();
+      // property.setEdgeColor(0, 0, 1);
+      // property.setEdgeVisibility(true)
+      // property.setRepresentationToWireframe()
+
+      ModelData[uniqueId] = {
+        type: 'Model',
+        key: uniqueId,
+        name: modelName + "-" + uniqueId,
+        actor: actor,
+        model_type: modelName,
+        params: params,
+        data: data,
+        volumns: [],
+        property: {
+          color: property.getColor(),
+          opacity: property.getOpacity(),
+        },
+        icon: ModelIcon[ModelTypeIndex[modelName]],
+        parent: parent,
+        voxelModel: voxelModel,
+      };
+      if (modelName == '布尔体') {
+        EventBus.emit('remove-componte-query', params.target.key);
+        for (let i = 0; i < params.tools.length; i++)
+          EventBus.emit('remove-componte-query', params.tools[i].key);
+      }
+
+      // console.log(ModelData);
+
+      // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
+      ModelData[parent].components.push(uniqueId);
+      onChange([1, parent, uniqueId, ModelData[uniqueId].name, 'Model', ModelData[uniqueId].icon]);
+      return uniqueId;
+    })
+    .catch(err => {
+      console.log(err);
+    });
 }
 const removeModel3 = (key) => {
   if (ModelData[key] != null) {
     global.renderer.removeActor(ModelData[key].actor);
   }
 }
-
 const showAxes = () => {
 
 }
 // ================================================================================ navBar toolBtn
+const JsonToString = obj => JSON.stringify(obj);
+const StringToJSON = str => {
+  return JSON.parse(str);
+}
+const downLoadFile = (file, name) => {
+  let url = window.URL.createObjectURL(new Blob([file]));
+  let link = document.createElement('a');
+  link.style.display = 'none';
+  link.href = url;
+  link.setAttribute('download', name);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link); // 下载完成移除元素
+  window.URL.revokeObjectURL(url); // 释放掉blob对象
+}
+const saveFile = () => {
+  downLoadFile("", "");
+}
+const BoolDlg = (mode) => {
+  EventBus.emit("LeftBar-open", ['BoolBar', mode]);
+}
+const resetActor = () => {
+  if (global.activeActor) {
+    global.activeActor.getProperty().setColor(global.activeColor);
+    global.activeActor = null;
+    global.renderWindow.render();
+  }
+}
+const ChooseActor = (actor) => {
+  if (actor) {
+    global.activeActor = actor;
+    global.activeColor = global.activeActor.getProperty().getColor();
+    actor.getProperty().setColor(1, 0, 0);
+    global.renderWindow.render();
+  }
+}
+const findDataByActor = (actor) => {
+  console.log(actor);
+  console.log(ModelData);
+
+  for (let prop in ModelData) {
+    const data = ModelData[prop];
+    if (actor === data.actor) {
+      return data;
+    }
+  }
+
+  return null;
+}
+EventBus.on('createBool', val => {
+  createModel3('布尔体', val.target.parent, val);
+})
 EventBus.on('tool-click', (val) => {
   console.log("vtkWindow", val);
   switch (val[0]) {
     case '标准':
       switch (val[1]) {
         case '打开':
-
           break;
         case '保存':
+          saveFile();
           break;
       }
       break;
     case '模型':
       createModel3(val[1]);
       break;
+    case '直接草图':
+      break;
+    case '布尔运算':
+      BoolDlg(val[1]);
 
     default:
       break;
@@ -562,15 +1059,18 @@ EventBus.on('tool-click', (val) => {
 onMounted(() => {
   // 生成window
   fullScreenRenderer.value = vtkFullScreenRenderWindow.newInstance({
-    background: [0.5, 0.5, 0.5],
+    background: [0.1, 0.1, 0.9],
     container: sectionRef.value,
   });
   global.renderer = fullScreenRenderer.value.getRenderer();
   global.camera = global.renderer.getActiveCamera();
   global.renderWindow = fullScreenRenderer.value.getRenderWindow();
   global.interactor = fullScreenRenderer.value.getInteractor();
+  // global.interactorStyle = global.interactor.getInteractorStyle();
+  global.picker = vtkPicker.newInstance();
+  global.interactor.setPicker(global.picker);
+
   // 设置背景
-  global.renderer.setBackground(0, 0.1, 0.4);
   // 生成 axes actor
   global.axesActor = vtkAxesActor.newInstance({
     config: {
@@ -592,11 +1092,25 @@ onMounted(() => {
   global.orientationMarkerWidget.setActor(global.axesActor);
   global.orientationMarkerWidget.setEnabled(true);
 
+  global.interactor.onMouseMove((e) => {
+    // console.log(e.position);
+    global.picker.pick([e.position.x, e.position.y, 0], global.renderer);
+    // global.picker.pick3DPoint([0,0, 12],[0,0,-12], global.renderer);
+    // console.log(global.picker.getActors());
+
+    resetActor();
+    if (global.picker.getActors().length)
+      ChooseActor(global.picker.getActors()[0]);
+  });
+  global.interactor.onLeftButtonPress((e) => {
+    EventBus.emit("pickActor", findDataByActor(global.activeActor));
+  })
+
+  //
   global.renderer.resetCamera();
   global.renderWindow.render();
   sendCamerainfo();
-
-
+  //
   logLightsInfo();
 });
 defineExpose({
@@ -610,6 +1124,6 @@ defineExpose({
 div {
   margin: 3px;
   background-color: #000;
-  border: 1px solid #ccc
+  /* border: 1px solid #ccc */
 }
 </style>

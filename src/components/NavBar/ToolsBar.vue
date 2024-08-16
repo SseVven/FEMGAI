@@ -20,32 +20,58 @@ const onClick = (btn) => {
 const headers = {
     authorization: 'authorization-text',
 };
-const url = ""
-const handleChange = info => {
-    if (info.file.status !== 'uploading') {
-        console.log(info.file);
-    }
-    if (info.file.status === 'done') {
-        message.success(`${info.file.name} file uploaded successfully`);
-    } else if (info.file.status === 'error') {
-        message.error(`${info.file.name} file upload failed.`);
-    }
-    axios.get('/data/list')
-        .then(function (response) {
-            // handle success
-            console.log(response);
-        })
-        .catch(function (error) {
-            // handle error
-            console.log(error);
-        })
-        .finally(function () {
-            // always executed
-        });
-};
-const customRequest = file => {
 
+const beforeCreate = () => {
+    // 读取文件
+    FileReader.prototype.reading = function ({ encode } = pms) {
+        let bytes = new Uint8Array(this.result);    //无符号整型数组
+        let text = new TextDecoder(encode || 'UTF-8').decode(bytes);
+        return text;
+    };
+    /* 重写readAsBinaryString函数 */
+    FileReader.prototype.readAsBinaryString = function (f) {
+        if (!this.onload)       //如果this未重写onload函数，则创建一个公共处理方式
+            this.onload = e => {  //在this.onload函数中，完成公共处理
+                let rs = this.reading();
+                console.log(rs);
+            };
+        this.readAsArrayBuffer(f);  //内部会回调this.onload方法
+    };
+};
+beforeCreate();
+const read = (f) => {
+    let rd = new FileReader();
+    rd.onload = e => {
+        //this.readAsArrayBuffer函数内，会回调this.onload函数。在这里处理结果
+        let cont = rd.reading({ encode: 'utf-8' })
+        console.log('数据', cont)
+        // 这个是我前端页面填充读取的wsdl数据的
+        // this.form.setFieldsValue({ serviceWsdl: cont })
+        // let formerData = this.textData
+        // this.textData = formerData + "\n" + cont
+    }
+    rd.readAsBinaryString(f)
 }
+
+const beforeUpload = (file) => {
+    console.log('打开前校验--文件类型', file);
+    console.log('打开前校验--文件类型', file.lastModifiedDate);
+    // 读取数据
+    read(file);
+    return false
+    // axios.get('/data/list')
+    //     .then(function (response) {
+    //         // handle success
+    //         console.log(response);
+    //     })
+    //     .catch(function (error) {
+    //         // handle error
+    //         console.log(error);
+    //     })
+    //     .finally(function () {
+    //         // always executed
+    //     });
+};
 </script>
 <template>
     <div class="toolBar">
@@ -53,8 +79,8 @@ const customRequest = file => {
             <div class="module">
                 <div class="tools">
                     <template v-for="tool in item.tools" :key="tool.icon">
-                        <a-upload name="file" :action="url" :headers="headers" @change="handleChange"
-                            :customRequest="customRequest" :showUploadList="false" v-if="tool.title == '打开'">
+                        <a-upload accept=".mmf" :beforeUpload="beforeUpload" :showUploadList="false"
+                            v-if="tool.title == '打开'">
                             <button :class="tool.icon + ' btn btn-light iconfont ' + btnsize[tool.type]" type="button"
                                 @click="onClick([item.name, tool.title])">
                                 <p>{{ tool.title }}</p>

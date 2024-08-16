@@ -6,9 +6,10 @@ import { createApp } from 'vue'
 import Antd from 'ant-design-vue';
 import App from './App.vue';
 import 'ant-design-vue/dist/reset.css';
-import "@/mockjs/index";
-import axios, {isCancel, AxiosError} from 'axios';
+// import "@/mockjs/index";
 
 const app = createApp(App);
-app.use(Antd).mount('#app');
-// createApp(App).mount('#app')
+
+app.use(Antd);
+app.mount('#app');
+// 全局挂载 axios
