@@ -184,7 +184,8 @@ const useCamera = () => {
     const temp = CameraChoosed.value;
     // console.log('"camera-choose":', CameraChoosed);
     if ('modelIndex' in temp) {
-        EventBus.emit("camera-choose", [temp.modelIndex, {
+        EventBus.emit("camera-choose", {
+            Mode: temp.modelIndex, 
             Position: [...temp.startPos],
             FocalPoint: [...temp.focus],
             ViewUp: [...temp.viewUp],
@@ -192,7 +193,7 @@ const useCamera = () => {
             MidPoses: temp.midPoses,
             Times: temp.times,
             Recycle: temp.recycle,
-        }])
+        })
     } else {
         EventBus.emit("light-choose", {
             key: temp.key,
