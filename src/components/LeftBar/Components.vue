@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import EventBus from '@/assets/common/event-bus';
+import ModelController from '@/assets/common/ModelControl';
 // const showLine = ref(true);
 const showIcon = ref(false);
 const treeData = ref([
@@ -103,7 +104,7 @@ EventBus.on('remove-componte-query', key => {
 })
 //
 const activeKey = ref([2]);
-const CenterStep = ref("0.01");
+const CenterStep = ref("1");
 </script>
 <template>
     <div class="left_container">
@@ -183,8 +184,8 @@ const CenterStep = ref("0.01");
                 <span style="line-height: 32px;">{{ ModelPropertyInfo.type }}</span>
                 <span style="padding-left: 20px; line-height: 32px;">模型类别:</span>
                 <span :class="'iconfont ' + ModelPropertyInfo.icon" style="line-height: 32px;">{{
-                    ModelPropertyInfo.model_type
-                }}</span>
+                    ModelController.ModelName[ModelPropertyInfo.model_type]
+                    }}</span>
             </div>
             <a-collapse v-model:activeKey="activeKey" accordion>
                 <a-collapse-panel key="1" header="属性"
@@ -228,25 +229,25 @@ const CenterStep = ref("0.01");
                     <a-list size="small">
                         <a-list-item>位置：
                             <a-select ref="select" v-model:value="CenterStep" style="width: 120px;">
-                                <a-select-option value="0.01">0.01</a-select-option>
-                                <a-select-option value="0.1">0.1</a-select-option>
                                 <a-select-option value="1">1</a-select-option>
+                                <a-select-option value="0.1">0.1</a-select-option>
+                                <a-select-option value="0.01">0.01</a-select-option>
                             </a-select>
                             <a-row>
                                 <a-col :span="8">
-                                    <a-input-number v-model:value="ModelPropertyInfo.voxelModel.center[0]"
+                                    <a-input-number v-model:value="ModelPropertyInfo.model.getMatrix().center[0]"
                                         style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
-                                        @change="InfoChanged('voxelModel')" />
+                                        @change="InfoChanged('center')" />
                                 </a-col>
                                 <a-col :span="8">
-                                    <a-input-number v-model:value="ModelPropertyInfo.voxelModel.center[1]"
+                                    <a-input-number v-model:value="ModelPropertyInfo.model.getMatrix().center[1]"
                                         style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
-                                        @change="InfoChanged('voxelModel')" />
+                                        @change="InfoChanged('center')" />
                                 </a-col>
                                 <a-col :span="8">
-                                    <a-input-number v-model:value="ModelPropertyInfo.voxelModel.center[2]"
+                                    <a-input-number v-model:value="ModelPropertyInfo.model.getMatrix().center[2]"
                                         style="margin-left: 16px;width: 80px;" :step="Number(CenterStep)"
-                                        @change="InfoChanged('voxelModel')" />
+                                        @change="InfoChanged('center')" />
                                 </a-col>
                             </a-row>
                         </a-list-item>
@@ -267,21 +268,21 @@ const CenterStep = ref("0.01");
                             <a-form-item label="半径" v-if="'radius' in ModelPropertyInfo.params"
                                 style="margin-left: 14px;">
                                 <a-input-number v-model:value="ModelPropertyInfo.params.radius" :min="0" :step="0.01"
-                                    style="margin-left: 16px" @change="InfoChanged('voxelModelparams')" />
+                                    style="margin-left: 16px" @change="InfoChanged('params')" />
                             </a-form-item>
                             <a-form-item label="高度" v-if="'height' in ModelPropertyInfo.params"
                                 style="margin-left: 14px;">
                                 <a-input-number v-model:value="ModelPropertyInfo.params.height" :step="0.01" :min="0"
-                                    style="margin-left: 16px" @change="InfoChanged('voxelModelparams')" />
+                                    style="margin-left: 16px" @change="InfoChanged('params')" />
                             </a-form-item>
                             <a-form-item label="边长" v-if="'XLen' in ModelPropertyInfo.params"
                                 style="margin-left: 14px;">
                                 <a-input-number v-model:value="ModelPropertyInfo.params.XLen" :step="0.01" :min="0"
-                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('voxelModelparams')" />
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
                                 <a-input-number v-model:value="ModelPropertyInfo.params.YLen" :step="0.01" :min="0"
-                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('voxelModelparams')" />
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
                                 <a-input-number v-model:value="ModelPropertyInfo.params.ZLen" :step="0.01" :min="0"
-                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('voxelModelparams')" />
+                                    style="width: 57px; margin-left: 5px" @change="InfoChanged('params')" />
                             </a-form-item>
                         </a-list-item>
                     </a-list>

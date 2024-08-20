@@ -111,6 +111,56 @@ const toolModules = [
         },
       ]
     },
+    {
+      name: "特征",
+      tools: [
+        {
+          title: "移动",
+          icon: "icon-jianmo-pingyi",
+          type: 2,
+        },
+        {
+          title: "旋转",
+          icon: "icon-xuanzhuan",
+          type: 2,
+        },
+        {
+          title: "伸缩",
+          icon: "icon-50-scale",
+          type: 2,
+        },
+        {
+          title: "拉伸",
+          icon: "icon-lashenx",
+          type: 2,
+        },
+        {
+          title: "抽壳",
+          icon: "icon-a-3Dchouke",
+          type: 2,
+        },
+        {
+          title: "倒角",
+          icon: "icon-a-3Dyuanjiaodaojiao",
+          type: 2,
+        },
+        {
+          title: "回旋",
+          icon: "icon-huixuanjiaodu",
+          type: 2,
+        },
+        {
+          title: "扫略",
+          icon: "icon-90zhuanwanjiaodaiji",
+          type: 2,
+        },
+        {
+          title: "镜像",
+          icon: "icon-caozuojiemiantubiao---_jingxiang",
+          type: 2,
+        },
+      ]
+    },
   ],
   [
     {
@@ -206,7 +256,7 @@ const HandleClick = (val) => {
 
     <div class="nav_mid nav nav-tabs" id="nav-tab" role="tablist">
       <button v-for="item in MenuBar" :key="item.name_en"
-        :class="item.name_en == 'File' ? 'nav-link active' : 'nav-link'" :id="item.id" data-bs-toggle="tab"
+        :class="item.name_en == 'Model' ? 'nav-link active' : 'nav-link'" :id="item.id" data-bs-toggle="tab"
         :data-bs-target="item.target" type="button" role="tab" :aria-controls="item.controls" aria-selected="false">
         {{ item.name_zh }}</button>
     </div>
@@ -216,7 +266,7 @@ const HandleClick = (val) => {
 
   <section class="tab-content" id="nav-tabContent">
     <div v-for="item in MenuBar" :key="item.name_en"
-      :class="item.name_en == 'File' ? 'tab-pane fade active show' : 'tab-pane fade'" :id="item.controls"
+      :class="item.name_en == 'Model' ? 'tab-pane fade active show' : 'tab-pane fade'" :id="item.controls"
       style="height: 100%;" role="tabpanel" :aria-labelledby="item.id" tabindex="0">
       <ToolsBar :name="item.name_en" :tool-modules="item.toolModules" @click="HandleClick" />
     </div>
@@ -250,10 +300,11 @@ section {
   cursor: pointer;
 }
 
-button{
+button {
   color: #fff;
 }
-button:hover{
+
+button:hover {
   color: #fff;
 }
 </style>

@@ -2,6 +2,7 @@ import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 import EventBus from './event-bus';
 import Model from "./Model";
+import Matrix from './Matrix';
 
 class ModelController {
     static ModelIcon = [
@@ -35,8 +36,6 @@ class ModelController {
         actor.setMapper(mapper);
         mapper.setInputData(data);
         this.renderer.addActor(actor);
-        this.renderWindow.render();
-
 
         const property = actor.getProperty();
         // property.setEdgeColor(0, 0, 1);
@@ -49,11 +48,12 @@ class ModelController {
             type: 'Model',
             key: uniqueId,
             name: ModelController.ModelName[type] + "-" + uniqueId,
-            actor: actor,
             model_type: type,
+            model: model,
+            actor: actor,
             params: model.getParams(),
             data: data,
-            volumns: [],
+            // volumns: [],
             property: {
                 color: property.getColor(),
                 opacity: property.getOpacity(),
@@ -73,7 +73,41 @@ class ModelController {
             [1, parent, uniqueId,
                 this.modelData[uniqueId].name,
                 'Model', this.modelData[uniqueId].icon]);
+
+        this.renderWindow.render();
         return uniqueId;
+    }
+
+    move(actor, center) {
+        actor.setPosition(center);
+    }
+
+    rotate(actor, pos, vec, deg) {
+        const matrix = this.findModelDataByActor(actor).model.getMatrix();
+        const afterMove = Matrix.rotateVectorAroundAxis(vec, [...matrix.center].map((v, k) => v - pos[k]), deg);
+        const rotateMatrix = Matrix.getRotateMatrix(vec, deg);
+        matrix.translate(matrix.center.map(v => -v));
+        matrix.rotateMatrix(rotateMatrix);
+        matrix.translate(pos);
+        matrix.translate(afterMove);
+
+        this.move(actor, [0, 0, 0]);
+        const dd = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]);
+        actor.rotateWXYZ(deg, vec[0] / dd, vec[1] / dd, vec[2] / dd);
+        this.move(actor, matrix.center);
+    }
+
+    scale(actor, scale) {
+        if (actor) {
+            actor.setScale(scale);
+            this.renderWindow.render();
+        }
+    }
+
+    showMatrix(actor) {
+        const mt = actor.getMatrix();
+        console.log(mt);
+        console.log(this.findModelDataByActor(actor).model.getMatrix().getMatrix4x4());
     }
 
     findModelDataByActor(actor) {
@@ -86,21 +120,64 @@ class ModelController {
         return null;
     }
 
+    getActiveModel() {
+        if (this.activeActor) {
+            return this.findModelDataByActor(this.activeActor).model;
+        }
+        return null;
+    }
+
+    resetActor() {
+        if (this.activeActor) {
+            this.activeActor.getProperty().setColor(this.activeColor);
+            this.activeActor = null;
+            this.renderWindow.render();
+        }
+    }
+
+    chooseActor(actor) {
+        if (actor) {
+            this.activeActor = actor;
+            this.activeColor = this.activeActor.getProperty().getColor();
+            actor.getProperty().setColor(1, 0, 0);
+            this.renderWindow.render();
+        }
+    }
+
     on() {
         EventBus.on('component-node-query', (val) => {
-            // console.log(this.modelData[val[0]]);
-            EventBus.emit("component-node-queryRes", this.modelData[val[0]]);
+            const data = this.modelData[val[0]];
+            // choose actor
+            this.resetActor();
+            this.chooseActor(data.actor);
+            EventBus.emit("component-node-queryRes", data);
+            EventBus.emit("pickActor", this.findModelDataByActor(this.activeActor));
         })
 
         EventBus.on('Property-changed', (val) => {
-            console.log("Property-changed", val);
+            // console.log("Property-changed", val);
             if (val[1] == 'color')
                 this.modelData[val[0]].actor.getProperty().setColor(this.modelData[val[0]].property.color)
             else if (val[1] == 'opacity')
                 this.modelData[val[0]].actor.getProperty().setOpacity(this.modelData[val[0]].property.opacity)
-            // else if (val[1] == 'params') {
-            //     setPolyData(this.modelData[val[0]].model_type, this.modelData[val[0]].params, this.modelData[val[0]].data);
-            // } else if (val[1] == 'voxelModel') {
+            else if (val[1] == 'center') {
+                const data = this.modelData[val[0]];
+                this.move(data.actor, data.model.getMatrix().center);
+            }
+            else if (val[1] == 'params') {
+                const data = this.modelData[val[0]];
+                const tdata = data.model.exportPolyData();
+                data.data.setPoints(tdata.getPoints());
+                data.data.setPolys(tdata.getPolys());
+            }
+            else if (val == 'Scale') {
+                this.activeActor.setScale(this.getActiveModel().getMatrix().getScale());
+                this.showMatrix(this.activeActor);
+            }
+            else if (val[0] == 'Rotate') {
+                this.rotate(this.activeActor, [val[1][3], val[1][4], val[1][5]], [val[1][0], val[1][1], val[1][2]], val[1][6]);
+            }
+            // else if (val[1] == 'voxelModel') {
             //     setPolyData('体素', this.modelData[val[0]].voxelModel, this.modelData[val[0]].data);
             // } else if (val[1] == 'voxelModelparams') {
             //     this.modelData[val[0]].voxelModel.resetParams(this.modelData[val[0]].params);

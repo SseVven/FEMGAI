@@ -134,6 +134,10 @@ class Model {
     getParams() {
         return this.params;
     }
+
+    getMatrix() {
+        return this.matrix;
+    }
 }
 
 // voxel modeling

@@ -31,11 +31,7 @@ const global = {};
 // ================================================================================ 组件控制器
 // 定义模型数据
 const ModelTypeIndex = { "立方体": 0, "圆锥": 1, "圆柱体": 2, "球体": 3, "布尔体": 4, }
-const FileIcon = [
-  "icon-wenjian",
-  "icon-m_ac_set",
-  "icon-bujian"
-]
+const FileIcon = ["icon-wenjian", "icon-m_ac_set", "icon-bujian"]
 const ModelData = {
   /*
   "key":{
@@ -105,27 +101,40 @@ EventBus.on('tool-click', (val) => {
       break;
     case '布尔运算':
       EventBus.emit("LeftBar-open", ['BoolBar', val[1]]);
-
+      break;
+    case '特征':
+      const model = global.modelController.getActiveModel();
+      switch (val[1]) {
+        case '旋转':
+          if (model)
+            EventBus.emit("LeftBar-Modal-open", ['Rotate', [1, 0, 0, 0, 0, 0, 360]]);
+          break;
+        case '伸缩':
+          if (model)
+            EventBus.emit("LeftBar-Modal-open", ['Scale', model.getMatrix().getScale()]);
+          break;
+      }
+      break;
     default:
       break;
   }
 })
 //
-const resetActor = () => {
-  if (global.activeActor) {
-    global.activeActor.getProperty().setColor(global.activeColor);
-    global.activeActor = null;
-    global.renderWindow.render();
-  }
-}
-const ChooseActor = (actor) => {
-  if (actor) {
-    global.activeActor = actor;
-    global.activeColor = global.activeActor.getProperty().getColor();
-    actor.getProperty().setColor(1, 0, 0);
-    global.renderWindow.render();
-  }
-}
+// const resetActor = () => {
+//   if (global.activeActor) {
+//     global.activeActor.getProperty().setColor(global.activeColor);
+//     global.activeActor = null;
+//     global.renderWindow.render();
+//   }
+// }
+// const ChooseActor = (actor) => {
+//   if (actor) {
+//     global.activeActor = actor;
+//     global.activeColor = global.activeActor.getProperty().getColor();
+//     actor.getProperty().setColor(1, 0, 0);
+//     global.renderWindow.render();
+//   }
+// }
 onMounted(() => {
   // ================================================================================ fullScreenRenderer
   fullScreenRenderer.value = vtkFullScreenRenderWindow.newInstance({
@@ -174,12 +183,14 @@ onMounted(() => {
     // global.picker.pick3DPoint([0,0, 12],[0,0,-12], global.renderer);
     // console.log(global.picker.getActors());
 
-    resetActor();
+    global.modelController.resetActor();
     if (global.picker.getActors().length)
-      ChooseActor(global.picker.getActors()[0]);
+      global.modelController.chooseActor(global.picker.getActors()[0]);
   });
   global.interactor.onLeftButtonPress((e) => {
-    EventBus.emit("pickActor", global.modelController.findModelDataByActor(global.activeActor));
+    const actActor = global.modelController.activeActor;
+    if (actActor)
+      EventBus.emit("component-node-query", [global.modelController.findModelDataByActor(actActor).key]);
   })
 
   // ================================================================================ flash renderer

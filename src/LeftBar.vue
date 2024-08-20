@@ -3,7 +3,7 @@ import Components from './components/LeftBar/Components.vue'
 import CameraControl from './components/LeftBar/CameraControl.vue'
 import BoolBar from './components/LeftBar/BoolBar.vue'
 import EventBus from './assets/common/event-bus';
-import { ref } from 'vue';
+import { ref, vModelDynamic } from 'vue';
 
 const isShow = ref({
     "BoolBar": false,
@@ -22,11 +22,32 @@ EventBus.on('LeftBar-close', (val) => {
 })
 const boolType = ref('交运算');
 EventBus.on('LeftBar-open', (val) => {
-    console.log('LeftBar-open', val);
     isShow.value[val[0]] = true;
     // 切换到对应tab
     clickBtn(val[0]);
 })
+
+
+const open = ref(false);
+const ModalTitle = ref('');
+const ModalData = ref([]);
+EventBus.on('LeftBar-Modal-open', (val) => {
+    open.value = true;
+    ModalTitle.value = val[0];
+
+    if (val.length > 1)
+        ModalData.value = val[1];
+})
+const handleOk = e => {
+    console.log(e);
+    open.value = false;
+};
+const InfoChanged = (val) => {
+    if (val == 'Rotate') {
+        EventBus.emit("Property-changed", [val, ModalData.value]);
+    } else
+        EventBus.emit("Property-changed", val);
+}
 </script>
 
 <template>
@@ -63,7 +84,58 @@ EventBus.on('LeftBar-open', (val) => {
             <!-- 布尔运算 -->
             <div :hidden="!isShow['BoolBar']" class="h_control tab-pane fade" id="v-pills-bool" role="tabpanel"
                 aria-labelledby="v-pills-bool-tab" tabindex="0">
-                <BoolBar :booltype="boolType"/>
+                <BoolBar :booltype="boolType" />
+            </div>
+
+            <div>
+                <a-modal v-model:open="open" :title="ModalTitle" @ok="handleOk">
+                    <a-form-item label="伸缩" v-if="ModalTitle == 'Scale'" style="margin-left: 14px;">
+                        <a-input-number v-model:value="ModalData[0]" :step="0.01" :min="0"
+                            style="width: 57px; margin-left: 5px" @change="InfoChanged('Scale')" />
+                        <a-input-number v-model:value="ModalData[1]" :step="0.01" :min="0"
+                            style="width: 57px; margin-left: 5px" @change="InfoChanged('Scale')" />
+                        <a-input-number v-model:value="ModalData[2]" :step="0.01" :min="0"
+                            style="width: 57px; margin-left: 5px" @change="InfoChanged('Scale')" />
+                    </a-form-item>
+                    <template v-else-if="ModalTitle == 'Rotate'">
+                        <a-form-item label="轴" style="margin-left: 14px;">
+                            <a-input-number v-model:value="ModalData[0]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-input-number v-model:value="ModalData[1]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-input-number v-model:value="ModalData[2]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-button-group style="margin-left: 20px;">
+                                <a-button type="primary"
+                                    @click="ModalData[0] = 1; ModalData[1] = 0; ModalData[2] = 0; InfoChanged('Rotate');">X轴</a-button>
+                                <a-button type="primary"
+                                    @click="ModalData[0] = 0; ModalData[1] = 1; ModalData[2] = 0; InfoChanged('Rotate');">Y轴</a-button>
+                                <a-button type="primary"
+                                    @click="ModalData[0] = 0; ModalData[1] = 0; ModalData[2] = 1; InfoChanged('Rotate');">Z轴</a-button>
+                            </a-button-group>
+                        </a-form-item>
+                        <a-form-item label="点" style="margin-left: 14px;">
+                            <a-input-number v-model:value="ModalData[3]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-input-number v-model:value="ModalData[4]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-input-number v-model:value="ModalData[5]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                        </a-form-item>
+                        <a-form-item label="角度(°)" style="margin-left: 14px;">
+                            <a-input-number v-model:value="ModalData[6]" :step="0.01"
+                                style="width: 57px; margin-left: 5px" @change="InfoChanged('Rotate')" />
+                            <a-button-group style="margin-left: 20px;">
+                                <a-button type="primary"
+                                    @click="ModalData[6] = 45; InfoChanged('Rotate');">45°</a-button>
+                                <a-button type="primary"
+                                    @click="ModalData[6] = 90; InfoChanged('Rotate');">90°</a-button>
+                                <a-button type="primary"
+                                    @click="ModalData[6] = 180; InfoChanged('Rotate');">180°</a-button>
+                            </a-button-group>
+                        </a-form-item>
+                    </template>
+                </a-modal>
             </div>
         </div>
     </nav>
