@@ -118,6 +118,9 @@ class Model {
                 }
             }
         }
+        else if (this.type == 4) {
+
+        }
         const vtkPs = vtkPoints.newInstance();
         const polys = vtkCellArray.newInstance();
         for (let i = 0; i < points.length; i++)

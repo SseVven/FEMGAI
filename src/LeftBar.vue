@@ -87,6 +87,7 @@ const InfoChanged = (val) => {
                 <BoolBar :booltype="boolType" />
             </div>
 
+            <!-- 伸缩、旋转 -->
             <div>
                 <a-modal v-model:open="open" :title="ModalTitle" @ok="handleOk">
                     <a-form-item label="伸缩" v-if="ModalTitle == 'Scale'" style="margin-left: 14px;">
