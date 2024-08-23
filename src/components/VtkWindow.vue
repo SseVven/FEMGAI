@@ -1,5 +1,5 @@
 <template>
-  <div @click="sendCamerainfo()" ref="sectionRef">
+  <div click="sendCamerainfo()" ref="sectionRef">
   </div>
 </template>
 
@@ -13,20 +13,19 @@ import '@kitware/vtk.js/Rendering/Profiles/Geometry';
 
 import vtkFullScreenRenderWindow from '@kitware/vtk.js/Rendering/Misc/FullScreenRenderWindow';
 import vtkPicker from '@kitware/vtk.js/Rendering/Core/Picker';
+import vtkCellPicker from '@kitware/vtk.js/Rendering/Core/CellPicker';
+import vtkPointPicker from '@kitware/vtk.js/Rendering/Core/PointPicker';
 
 import EventBus from '@/assets/common/event-bus';
 import axios from 'axios'
 // import api from '@/assets/common/request.js'
 
-import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
-import vtkOrientationMarkerWidget from '@kitware/vtk.js/Interaction/Widgets/OrientationMarkerWidget';
-
 import LightController from '@/assets/common/LightControl';
 import CameraController from '@/assets/common/CameraControl';
 import ModelController from '@/assets/common/ModelControl';
+import InteractorController from '@/assets/common/interactorControl';
 import saveFile from '@/assets/common/FileControl';
 
-let fullScreenRenderer = ref(null);
 const global = {};
 // ================================================================================ 组件控制器
 // 定义模型数据
@@ -90,7 +89,7 @@ EventBus.on('tool-click', (val) => {
         case '打开':
           break;
         case '保存':
-          saveFile();
+          saveFile(global.modelController, 'STL');
           break;
       }
       break;
@@ -119,35 +118,21 @@ EventBus.on('tool-click', (val) => {
       break;
   }
 })
-//
-// const resetActor = () => {
-//   if (global.activeActor) {
-//     global.activeActor.getProperty().setColor(global.activeColor);
-//     global.activeActor = null;
-//     global.renderWindow.render();
-//   }
-// }
-// const ChooseActor = (actor) => {
-//   if (actor) {
-//     global.activeActor = actor;
-//     global.activeColor = global.activeActor.getProperty().getColor();
-//     actor.getProperty().setColor(1, 0, 0);
-//     global.renderWindow.render();
-//   }
-// }
 onMounted(() => {
   // ================================================================================ fullScreenRenderer
-  fullScreenRenderer.value = vtkFullScreenRenderWindow.newInstance({
+  global.fullScreenRenderer = vtkFullScreenRenderWindow.newInstance({
     background: [0.1, 0.1, 0.9],
     container: sectionRef.value,
   });
-  global.renderer = fullScreenRenderer.value.getRenderer();
-  global.renderWindow = fullScreenRenderer.value.getRenderWindow();
-  global.interactor = fullScreenRenderer.value.getInteractor();
+  global.renderer = global.fullScreenRenderer.getRenderer();
+  global.renderWindow = global.fullScreenRenderer.getRenderWindow();
+  global.interactor = global.fullScreenRenderer.getInteractor();
 
   global.camera = global.renderer.getActiveCamera();
   // global.interactorStyle = global.interactor.getInteractorStyle();
   global.picker = vtkPicker.newInstance();
+  global.cellPicker = vtkCellPicker.newInstance();
+  global.pointPicker = vtkPointPicker.newInstance();
   global.interactor.setPicker(global.picker);
   // ================================================================================ Custom Controller
   global.lightController = new LightController(global.renderer);
@@ -156,50 +141,11 @@ onMounted(() => {
   global.cameraController.on();
   global.modelController = new ModelController(global.renderer, ModelData);
   global.modelController.on();
-  // ================================================================================ axes
-  global.axesActor = vtkAxesActor.newInstance({
-    config: {
-      recenter: false,
-      tipLength: 0.2,
-      tipRadius: 0.1,
-      shaftRadius: 0.03
-    },
-    yConfig: {
-      color: [0, 255, 0],
-    },
-    zConfig: {
-      color: [0, 0, 255]
-    }
-  });
-  global.orientationMarkerWidget = vtkOrientationMarkerWidget.newInstance();
-  global.orientationMarkerWidget.setParentRenderer(global.renderer);
-  global.orientationMarkerWidget.setInteractor(global.interactor);
-  global.orientationMarkerWidget.setActor(global.axesActor);
-  global.orientationMarkerWidget.setEnabled(true);
-  // ================================================================================ interactor
-  global.interactor.onMouseMove((e) => {
-    // console.log(e.position);
-    global.picker.pick([e.position.x, e.position.y, 0], global.renderer);
-    // global.picker.pick3DPoint([0,0, 12],[0,0,-12], global.renderer);
-    // console.log(global.picker.getActors());
-
-    global.modelController.resetActor();
-    if (global.picker.getActors().length)
-      global.modelController.chooseActor(global.picker.getActors()[0]);
-  });
-  global.interactor.onLeftButtonPress((e) => {
-    const actActor = global.modelController.activeActor;
-    if (actActor)
-      EventBus.emit("component-node-query", [global.modelController.findModelDataByActor(actActor).key]);
-  })
-
+  global.interactorController = new InteractorController(global.fullScreenRenderer, sectionRef.value);
+  global.interactorController.showAxes(true);
   // ================================================================================ flash renderer
   global.renderer.resetCamera();
   global.renderWindow.render();
-});
-
-defineExpose({
-  fullScreenRenderer
 });
 </script>
 
@@ -207,7 +153,7 @@ defineExpose({
 <style scoped>
 div {
   margin: 3px;
-  background-color: #000;
+  /* background-color: #000; */
   /* border: 1px solid #ccc */
 }
 </style>

@@ -30,7 +30,7 @@ class ModelController {
     createModel3(type, parent = 'default', fParams = null) {
         const model = new Model(type, fParams);
 
-        const data = model.exportPolyData();
+        const data = model.exportPolyData(false);
         const actor = vtkActor.newInstance();
         const mapper = vtkMapper.newInstance();
         actor.setMapper(mapper);
@@ -99,7 +99,7 @@ class ModelController {
 
     scale(actor, scale) {
         if (actor) {
-            actor.setScale(scale);
+            actor.setScaleFrom(scale);
             this.renderWindow.render();
         }
     }
@@ -129,7 +129,8 @@ class ModelController {
 
     resetActor() {
         if (this.activeActor) {
-            this.activeActor.getProperty().setColor(this.activeColor);
+            // this.activeActor.getProperty().setColor(this.activeColor);
+            this.activeActor.getProperty().setRepresentationToSurface();
             this.activeActor = null;
             this.renderWindow.render();
         }
@@ -139,13 +140,14 @@ class ModelController {
         if (actor) {
             this.activeActor = actor;
             this.activeColor = this.activeActor.getProperty().getColor();
-            actor.getProperty().setColor(1, 0, 0);
+            this.activeActor.getProperty().setRepresentationToWireframe();
+            // actor.getProperty().setColor(1, 0, 0);
             this.renderWindow.render();
         }
     }
 
     on() {
-        EventBus.on('component-node-query', (val) => {
+        EventBus.on('component-node-query', val => {
             const data = this.modelData[val[0]];
             // choose actor
             this.resetActor();
@@ -154,7 +156,7 @@ class ModelController {
             EventBus.emit("pickActor", this.findModelDataByActor(this.activeActor));
         })
 
-        EventBus.on('Property-changed', (val) => {
+        EventBus.on('Property-changed', val => {
             // console.log("Property-changed", val);
             if (val[1] == 'color')
                 this.modelData[val[0]].actor.getProperty().setColor(this.modelData[val[0]].property.color)
@@ -186,7 +188,7 @@ class ModelController {
             this.renderWindow.render();
         })
 
-        EventBus.on('component-add-query', (val) => {
+        EventBus.on('component-add-query', val => {
             const data = this.modelData[val[0]];
             if (data == null)
                 return;
@@ -215,7 +217,7 @@ class ModelController {
                 [1, data.key, model.key, model.name, model.type, model.icon]);
         })
 
-        EventBus.on('component-remove-query', (val) => {
+        EventBus.on('component-remove-query', val => {
             const data = this.modelData[val];
             // console.log("component-remove-query", val, data, DataStruct, ModelData);
             // 找到父节点然后删掉 or 遍历移除掉 data 的components 的actor
@@ -234,7 +236,14 @@ class ModelController {
         })
 
         EventBus.on('createBool', val => {
+            console.log(val);
+
             this.createModel3(4, val.target.parent, val);
+        })
+
+        EventBus.on('pick-actor', prop => {
+            this.resetActor();
+            this.chooseActor(prop);
         })
     }
 }

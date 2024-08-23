@@ -31,33 +31,44 @@ class Model {
         this.type = type;
         this.params = params || Model.defaultParams[type];
         this.matrix = matrix || new Matrix();
+        this.data = vtkPolyData.newInstance();
+        this.points = [];
+        this.polys = [];
+
+        this.vertices = [];
+        this.lines = [];
+
+        this.exportPolyData();
     }
 
     // 根据参数 this.params 生成对应的 vtkpolydata 以供渲染 
     // 渲染记得带上变换矩阵 matrix 
-    exportPolyData() {
-        const data = vtkPolyData.newInstance();
-        let points = [];
-        let faces = [];
+    exportPolyData(isReset = true) {
+        if (!isReset) {
+            return this.data;
+        }
+        this.points = [];
+        this.polys = [];
         if (this.type == 0) {
-            points = [[0, 0, 0], [this.params.XLen, 0, 0], [0, 0, this.params.ZLen], [this.params.XLen, 0, this.params.ZLen], [0, this.params.YLen, 0], [this.params.XLen, this.params.YLen, 0], [0, this.params.YLen, this.params.ZLen], [this.params.XLen, this.params.YLen, this.params.ZLen]];
-            faces = [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [2, 3, 7, 6], [2, 0, 4, 6]];
+            this.points = [[0, 0, 0], [this.params.XLen, 0, 0], [0, 0, this.params.ZLen], [this.params.XLen, 0, this.params.ZLen], [0, this.params.YLen, 0], [this.params.XLen, this.params.YLen, 0], [0, this.params.YLen, this.params.ZLen], [this.params.XLen, this.params.YLen, this.params.ZLen]];
+            this.polys = [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [2, 3, 7, 6], [2, 0, 4, 6]];
+            this.vertices = [0, 1, 2, 3, 4, 5, 6, 7];
         }
         else if (this.type == 1) {
             const APoint = [this.params.height, 0, 0];
             const CPoint = [0, 0, this.params.radius];
             const interalDeg = 360 / this.params.resolution;
-            points.push(APoint);
+            this.points.push(APoint);
             const btm = [];
             for (let i = 0; i < this.params.resolution; i++) {
-                points.push(Matrix.rotateVectorAroundAxis(APoint, CPoint, interalDeg * i));
+                this.points.push(Matrix.rotateVectorAroundAxis(APoint, CPoint, interalDeg * i));
                 if (i == this.params.resolution - 1)
-                    faces.push([0, i + 1, 1]);
+                    this.polys.push([0, i + 1, 1]);
                 else
-                    faces.push([0, i + 1, i + 2]);
+                    this.polys.push([0, i + 1, i + 2]);
                 btm.push(i + 1);
             }
-            faces.push(btm);
+            this.polys.push(btm);
         }
         else if (this.type == 2) {
             const direct = [this.params.height, 0, 0];
@@ -67,19 +78,19 @@ class Model {
             const btm = [];
             for (let i = 0; i < this.params.resolution; i++) {
                 let tmp = Matrix.rotateVectorAroundAxis(direct, CPoint, interalDeg * i);
-                points.push(tmp);
-                points.push(tmp.map((v, k) => v + direct[k]));
+                this.points.push(tmp);
+                this.points.push(tmp.map((v, k) => v + direct[k]));
 
                 if (i == this.params.resolution - 1)
-                    faces.push([2 * i, 2 * i + 1, 1, 0]);
+                    this.polys.push([2 * i, 2 * i + 1, 1, 0]);
                 else
-                    faces.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2]);
+                    this.polys.push([2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2]);
 
                 btm.push(2 * i);
                 top.push(2 * i + 1);
             }
-            faces.push(btm);
-            faces.push(top);
+            this.polys.push(btm);
+            this.polys.push(top);
         }
         else if (this.type == 3) {
             const CPoint = [this.params.radius, 0, 0];
@@ -87,51 +98,69 @@ class Model {
             const interalDeg1 = 180 / this.params.resolution;
             const interalDeg = 360 / this.params.resolution;
 
-            points.push(CPoint);
+            this.points.push(CPoint);
             for (let i = 1; i < this.params.resolution; i++) {
                 let tmp = Matrix.rotateVectorAroundAxis([0, 1, 0], CPoint, interalDeg1 * i);
                 for (let j = 0; j < this.params.resolution; j++) {
                     let tmp2 = Matrix.rotateVectorAroundAxis([1, 0, 0], tmp, interalDeg * j);
 
-                    points.push(tmp2);
+                    this.points.push(tmp2);
                 }
             }
-            points.push(DPoint);
+            this.points.push(DPoint);
 
             for (let i = 0; i < this.params.resolution; i++) {
                 if (i == this.params.resolution - 1) {
-                    faces.push([0, i + 1, 1]);
-                    faces.push([this.params.resolution * (this.params.resolution - 1) + 1, (this.params.resolution - 2) * this.params.resolution + i + 1, (this.params.resolution - 2) * this.params.resolution + 1]);
+                    this.polys.push([0, i + 1, 1]);
+                    this.polys.push([this.params.resolution * (this.params.resolution - 1) + 1, (this.params.resolution - 2) * this.params.resolution + i + 1, (this.params.resolution - 2) * this.params.resolution + 1]);
                 }
                 else {
-                    faces.push([0, i + 1, i + 2]);
-                    faces.push([this.params.resolution * (this.params.resolution - 1) + 1, (this.params.resolution - 2) * this.params.resolution + i + 1, (this.params.resolution - 2) * this.params.resolution + i + 2]);
+                    this.polys.push([0, i + 1, i + 2]);
+                    this.polys.push([this.params.resolution * (this.params.resolution - 1) + 1, (this.params.resolution - 2) * this.params.resolution + i + 1, (this.params.resolution - 2) * this.params.resolution + i + 2]);
                 }
             }
 
             for (let i = 0; i < this.params.resolution - 2; i++) {
                 for (let j = 0; j < this.params.resolution; j++) {
                     if (j == this.params.resolution - 1)
-                        faces.push([i * this.params.resolution + j + 1, i * this.params.resolution + 1, (i + 1) * this.params.resolution + 1, (i + 1) * this.params.resolution + j + 1]);
+                        this.polys.push([i * this.params.resolution + j + 1, i * this.params.resolution + 1, (i + 1) * this.params.resolution + 1, (i + 1) * this.params.resolution + j + 1]);
                     else
-                        faces.push([i * this.params.resolution + j + 1, i * this.params.resolution + j + 2, (i + 1) * this.params.resolution + j + 2, (i + 1) * this.params.resolution + j + 1]);
+                        this.polys.push([i * this.params.resolution + j + 1, i * this.params.resolution + j + 2, (i + 1) * this.params.resolution + j + 2, (i + 1) * this.params.resolution + j + 1]);
                 }
             }
         }
         else if (this.type == 4) {
+            const boolType = this.params.boolType;
+            const targetData = this.params.target;
+            const toolsData = this.params.tools;
 
+            if (boolType == '交运算') {
+                this.points = [...targetData.model.points];
+                this.polys = [...targetData.model.polys];
+
+            }
+            else if (boolType == '差运算') {
+
+            }
+            else if (boolType == '并运算') {
+
+            }
         }
         const vtkPs = vtkPoints.newInstance();
         const polys = vtkCellArray.newInstance();
-        for (let i = 0; i < points.length; i++)
-            vtkPs.insertNextPoint(points[i][0], points[i][1], points[i][2]);
-        for (let i = 0; i < faces.length; i++)
-            polys.insertNextCell(faces[i]);
+        const verts = vtkCellArray.newInstance();
+        for (let i = 0; i < this.points.length; i++)
+            vtkPs.insertNextPoint(this.points[i][0], this.points[i][1], this.points[i][2]);
+        for (let i = 0; i < this.polys.length; i++)
+            polys.insertNextCell(this.polys[i]);
+        // for (let i = 0; i < this.vertices.length; i++)
+        verts.insertNextCell(this.vertices);
 
-        data.setPoints(vtkPs);
-        data.setPolys(polys);
+        this.data.setPoints(vtkPs);
+        this.data.setPolys(polys);
+        this.data.setVerts(verts);
 
-        return data;
+        return this.data;
     }
 
     getParams() {
