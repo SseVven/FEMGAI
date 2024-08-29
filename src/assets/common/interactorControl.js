@@ -6,7 +6,6 @@ import {
     FieldAssociations,
 } from '@kitware/vtk.js/Common/DataModel/DataSet/Constants';
 import EventBus from './event-bus';
-import { log } from 'mathjs';
 
 class InteractorController {
     constructor(fullScreenRenderer, container) {
@@ -20,6 +19,7 @@ class InteractorController {
         });
         this.selector.setFieldAssociation(FieldAssociations.FIELD_ASSOCIATION_POINTS);
         this.selector.attach(this.openGLRenderWindow, this.renderer);
+        this.pickerMode = 0; // 默认prop拾取
 
         this.initAxes();
         this.onMouseMove();
@@ -74,8 +74,10 @@ class InteractorController {
                 return;
             }
             this.renderWindow.render();
-            EventBus.emit('mosemovde-info', e1[0]);
-            EventBus.emit('pick-actor', e1[0].prop);
+            EventBus.emit('mosemovde-info', e1[0]); // footer
+
+            if (this.pickerMode == 0)
+                EventBus.emit('pick-actor', e1[0].prop);
         })
     }
 
@@ -142,6 +144,14 @@ class InteractorController {
             return selection;
         }
         return [];
+    }
+
+    on() {
+        EventBus.on('tools-trigger', id => {
+            if (id < 4) {
+                this.pickerMode = id;
+            }
+        })
     }
 }
 export default InteractorController;

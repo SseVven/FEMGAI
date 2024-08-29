@@ -24,13 +24,15 @@ import LightController from '@/assets/common/LightControl';
 import CameraController from '@/assets/common/CameraControl';
 import ModelController from '@/assets/common/ModelControl';
 import InteractorController from '@/assets/common/interactorControl';
-import saveFile from '@/assets/common/FileControl';
+import { saveFile } from '@/assets/common/FileControl';
 
 const global = {};
 // ================================================================================ 组件控制器
 // 定义模型数据
-const ModelTypeIndex = { "立方体": 0, "圆锥": 1, "圆柱体": 2, "球体": 3, "布尔体": 4, }
-const FileIcon = ["icon-wenjian", "icon-m_ac_set", "icon-bujian"]
+const ModelTypeIndex = {};
+for (let i = 0; i < ModelController.ModelName.length; i++)
+  ModelTypeIndex[ModelController.ModelName[i]] = i;
+const FileIcon = ModelController.FileIcon;
 const ModelData = {
   /*
   "key":{
@@ -45,7 +47,8 @@ const ModelData = {
     “data": polydata,
     "icon": String,
     "parent": String,
-    "voxelModel": VoxelModel
+    "voxelModel": VoxelModel,
+    "visibility": Boolean
   }
   */
 }
@@ -56,7 +59,8 @@ const DataStruct = [
     key: 'default',
     children: [],
     icon: FileIcon[0],
-    parent: null
+    parent: null,
+    visibility: true,
   }
 ]
 ModelData['default'] = {
@@ -89,12 +93,15 @@ EventBus.on('tool-click', (val) => {
         case '打开':
           break;
         case '保存':
-          saveFile(global.modelController, 'STL');
+          saveFile(global.modelController, 'PLY');
           break;
       }
       break;
     case '模型':
-      global.modelController.createModel3(ModelTypeIndex[val[1]]);
+      if (ModelTypeIndex[val[1]] < 4)
+        global.modelController.createModel3(ModelTypeIndex[val[1]]);
+      else
+        EventBus.emit("component-add-query", ['default', 1, 5]);
       break;
     case '直接草图':
       break;
@@ -142,6 +149,7 @@ onMounted(() => {
   global.modelController = new ModelController(global.renderer, ModelData);
   global.modelController.on();
   global.interactorController = new InteractorController(global.fullScreenRenderer, sectionRef.value);
+  global.interactorController.on();
   global.interactorController.showAxes(true);
   // ================================================================================ flash renderer
   global.renderer.resetCamera();

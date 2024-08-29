@@ -5,7 +5,6 @@ import ModelController from '@/assets/common/ModelControl';
 // const showLine = ref(true);
 const showIcon = ref(false);
 const treeData = ref([
-
 ]);
 const findNode = (key) => {
     const myque = [];
@@ -26,18 +25,13 @@ const findNode = (key) => {
 }
 const controlTreeNode = (mode, val) => {
     if (mode == 0) {
-        // console.log(ModelPropertyInfo.value.key, val);
         findNode(ModelPropertyInfo.value.key)[val[0]] = val[1];
     }
 }
 const InfoChanged = (property) => {
     EventBus.emit("Property-changed", [ModelPropertyInfo.value.key, property]);
-
-    // if (property == 'color')
-    //     ModelPropertyInfo.value.actor.getProperty().setColor(ModelPropertyInfo.value.property.color);
 }
 const onSelect = (selectedKeys, info) => {
-    // console.log('selected', selectedKeys, info);
     // 把节点的key丢过去，返回节点的信息回来
     if (selectedKeys.length > 0)
         EventBus.emit("component-node-query", [selectedKeys[0], info.node.type]);
@@ -61,17 +55,26 @@ EventBus.on('dataStructChange', (val) => {
         // 新增
         case 1:
             let node = findNode(val[1])
-
             if (!('children' in node))
                 node.children = [];
+
             node.children.push({
                 title: val[3],
                 key: val[2],
                 type: val[4],
                 icon: val[5],
                 parent: val[1],
+                visibility: val[6],
+                sonsVisiState: false,
             })
             ExpandKey.value.push(val[1])
+            break;
+        // 修改
+        case 2:
+            let node2 = findNode(val[1]);
+            node2.visibility = val[2];
+            if (val.length > 3)
+                node2.sonsVisiState = val[3];
             break;
         default:
             break;
@@ -105,54 +108,64 @@ EventBus.on('remove-componte-query', key => {
 //
 const activeKey = ref([2]);
 const CenterStep = ref("1");
+//
+const controlVisibility = node => {
+    EventBus.emit('component-visibility', node);
+}
 </script>
 <template>
     <div class="left_container">
         <p class="head_title">组件控制器</p>
         <section style="flex: 1;display: flex;flex-direction: column;overflow: auto;">
-            <!-- <div style="padding: 4px;border-bottom: 1px solid #ccc;">
-                showIcon:
-                <a-switch v-model:checked="showIcon" />
-            </div> -->
             <div style="flex: 1;overflow: auto;">
                 <a-tree :show-line="true" :show-icon="showIcon" :tree-data="treeData" v-model:expandedKeys="ExpandKey"
                     @select="onSelect">
                     <template #title="{ dataRef }">
-                        <!-- <template v-if="dataRef.key === '0-0-0-1'">
-                            <div>multiple line title</div>
-                            <div>multiple line title</div>
-                        </template> -->
-
                         <div style="display: flex; gap: 10px; height: 32px; align-items: center;">
+                            <!-- 图标、名称 -->
                             <span style="line-height: 32px;" :class="'iconfont ' + dataRef.icon">
                                 {{ " " + dataRef.title }}
                             </span>
+                            <!-- 显示 -->
+                            <a-checkbox :indeterminate="dataRef.sonsVisiState" v-model:checked="dataRef.visibility"
+                                @click.stop="controlVisibility(dataRef)" />
+                            <!-- 添加、删除 -->
                             <a-button-group>
+                                <!-- 添加 -->
                                 <a-dropdown v-if="dataRef.type != 'Model'">
                                     <template #overlay>
                                         <a-menu>
                                             <a-menu-item key="1" @click="addComponent(dataRef, 2)">
-                                                <span class="iconfont icon-bujian">&nbsp;组件</span>
+                                                <span :class="'iconfont ' + ModelController.FileIcon[2]">&nbsp;组件</span>
                                             </a-menu-item>
                                             <a-menu-item key="2">
                                                 <a-dropdown v-if="dataRef.type != 'Model'">
                                                     <template #overlay>
                                                         <a-menu>
                                                             <a-menu-item key="2-1" @click="addComponent(dataRef, 1, 0)">
-                                                                <span class="iconfont icon-m_ac_set">&nbsp;立方体</span>
+                                                                <span
+                                                                    :class="'iconfont ' + ModelController.ModelIcon[0]">&nbsp;立方体</span>
                                                             </a-menu-item>
                                                             <a-menu-item key="2-2" @click="addComponent(dataRef, 1, 1)">
-                                                                <span class="iconfont icon-yuanzhuiti">&nbsp;圆锥</span>
+                                                                <span
+                                                                    :class="'iconfont ' + ModelController.ModelIcon[1]">&nbsp;圆锥</span>
                                                             </a-menu-item>
                                                             <a-menu-item key="2-3" @click="addComponent(dataRef, 1, 2)">
-                                                                <span class="iconfont icon-cylinder">&nbsp;圆柱体</span>
+                                                                <span
+                                                                    :class="'iconfont ' + ModelController.ModelIcon[2]">&nbsp;圆柱体</span>
                                                             </a-menu-item>
                                                             <a-menu-item key="2-4" @click="addComponent(dataRef, 1, 3)">
-                                                                <span class="iconfont icon-fi-sr-sphere">&nbsp;球体</span>
+                                                                <span
+                                                                    :class="'iconfont ' + ModelController.ModelIcon[3]">&nbsp;球体</span>
+                                                            </a-menu-item>
+                                                            <a-menu-item key="2-5" @click="addComponent(dataRef, 1, 5)">
+                                                                <span
+                                                                    :class="'iconfont ' + ModelController.ModelIcon[5]">&nbsp;导入</span>
                                                             </a-menu-item>
                                                         </a-menu>
                                                     </template>
-                                                    <span class="iconfont icon-m_ac_set">&nbsp;模型&nbsp;<i
+                                                    <span
+                                                        :class="'iconfont ' + ModelController.FileIcon[1]">&nbsp;模型&nbsp;<i
                                                             class="iconfont icon-jiantouxia"></i></span>
                                                 </a-dropdown>
                                             </a-menu-item>
@@ -162,7 +175,7 @@ const CenterStep = ref("1");
                                         +
                                     </a-button>
                                 </a-dropdown>
-
+                                <!-- 删除 -->
                                 <a-button @click.stop="removeComponent(dataRef.key);"
                                     style="height: 24px;padding:0 7px;line-height: 22px;" danger
                                     type="primary">-</a-button>
@@ -185,7 +198,7 @@ const CenterStep = ref("1");
                 <span style="padding-left: 20px; line-height: 32px;">模型类别:</span>
                 <span :class="'iconfont ' + ModelPropertyInfo.icon" style="line-height: 32px;">{{
                     ModelController.ModelName[ModelPropertyInfo.model_type]
-                    }}</span>
+                }}</span>
             </div>
             <a-collapse v-model:activeKey="activeKey" accordion>
                 <a-collapse-panel key="1" header="属性"

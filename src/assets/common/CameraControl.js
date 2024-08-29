@@ -3,6 +3,50 @@ import EventBus from "./event-bus";
 let PreCameraControl = 0;
 
 class CameraController {
+    static baseCameraControl = [
+        {
+            Mode: 1,
+            Position: [0, 0, 1],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 1, 0],
+            ViewAngle: 30.0,
+        },
+        {
+            Mode: 1,
+            Position: [-1, 0, 0],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 1, 0],
+            ViewAngle: 30.0,
+        },
+        {
+            Mode: 1,
+            Position: [0, 1, 0],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 0, -1],
+            ViewAngle: 30.0,
+        },
+        {
+            Mode: 1,
+            Position: [0, 0, -1],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 1, 0],
+            ViewAngle: 30.0,
+        },
+        {
+            Mode: 1,
+            Position: [1, 0, 0],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 1, 0],
+            ViewAngle: 30.0,
+        },
+        {
+            Mode: 1,
+            Position: [0, -1, 0],
+            FocalPoint: [0, 0, 0],
+            ViewUp: [0, 0, 1],
+            ViewAngle: 30.0,
+        },
+    ];
     constructor(renderer) {
         this.renderer = renderer;
         this.camera = renderer.getActiveCamera();
@@ -60,7 +104,7 @@ class CameraController {
     }
 
     on() {
-        EventBus.on('camera-choose', (val) => {
+        EventBus.on('camera-choose', val => {
             if (val)
                 if (PreCameraControl == 0) {
                     // console.log("'camera-choose get:'", val);
@@ -69,8 +113,13 @@ class CameraController {
                 }
                 else {
                     //   // 打断上一个相机控制  然后再执行新的相机控制
-
                 }
+        })
+
+        EventBus.on('tools-trigger', id => {
+            if (3 < id && id < 10) {
+                EventBus.emit("camera-choose", CameraController.baseCameraControl[id - 4]);
+            }
         })
     }
 }

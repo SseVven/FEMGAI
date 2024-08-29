@@ -63,7 +63,7 @@ const treeData = ref([
             {
                 changeable: false,
                 key: '0-4',
-                title: '下视角',
+                title: '仰视角',
                 modelIndex: 1,
                 startPos: [0, -1, 0],
                 focus: [0, 0, 0],
