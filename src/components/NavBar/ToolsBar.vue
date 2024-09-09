@@ -11,9 +11,7 @@ const props = defineProps({
 })
 const btnsize = ['btn_l', 'btn_m', 'btn_s']
 const emits = defineEmits(["click"])
-const onClick = (btn) => {
-    emits("click", btn)
-}
+const onClick = btn => emits("click", btn)
 </script>
 <template>
     <div class="toolBar">
@@ -21,9 +19,22 @@ const onClick = (btn) => {
             <div class="module">
                 <div class="tools">
                     <template v-for="tool in item.tools" :key="tool.icon">
+                        <!-- 含有sons的ToolButton -->
+                        <a-dropdown v-if="'sons' in tool">
+                            <button :class="tool.icon + ' btn btn-light iconfont ' + btnsize[tool.type]" type="button">
+                                <p>{{ tool.title }}</p>
+                            </button>
+                            <template #overlay>
+                                <a-menu>
+                                    <a-menu-item v-for="son in tool.sons" :key="son.id"
+                                        @click="onClick([item.name, tool.title, son.id])">
+                                        {{ son.title }}</a-menu-item>
+                                </a-menu>
+                            </template>
+                        </a-dropdown>
                         <!-- 通用ToolButton -->
-                        <button :class="tool.icon + ' btn btn-light iconfont ' + btnsize[tool.type]" type="button"
-                            @click="onClick([item.name, tool.title])">
+                        <button v-else :class="tool.icon + ' btn btn-light iconfont ' + btnsize[tool.type]"
+                            type="button" @click="onClick([item.name, tool.title])">
                             <p>{{ tool.title }}</p>
                         </button>
                     </template>

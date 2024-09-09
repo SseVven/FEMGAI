@@ -15,16 +15,16 @@ class Model {
         {
             radius: 1,
             height: 1,
-            resolution: 150,
+            resolution: 300,
         },
         {
             radius: 1,
             height: 1,
-            resolution: 150,
+            resolution: 300,
         },
         {
             radius: 1,
-            resolution: 150,
+            resolution: 300,
         }
     ]
     constructor(type, params, matrix = null) {
@@ -35,15 +35,16 @@ class Model {
         this.points = [];
         this.polys = [];
 
-        this.vertices = [];
-        this.lines = [];
+        // 精度几何信息
+        this.vertices = []; // 模型的几何顶点
+        this.lines = []; // 模型的几何边
 
         this.exportPolyData();
     }
 
     // 根据参数 this.params 生成对应的 vtkpolydata 以供渲染 
     // 渲染记得带上变换矩阵 matrix 
-    exportPolyData(isReset = true) {
+    exportPolyData(isReset = true, mode = [1, 0, 0, 0]) {
         if (!isReset) {
             return this.data;
         }
@@ -53,6 +54,7 @@ class Model {
             this.points = [[0, 0, 0], [this.params.XLen, 0, 0], [0, 0, this.params.ZLen], [this.params.XLen, 0, this.params.ZLen], [0, this.params.YLen, 0], [this.params.XLen, this.params.YLen, 0], [0, this.params.YLen, this.params.ZLen], [this.params.XLen, this.params.YLen, this.params.ZLen]];
             this.polys = [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [1, 3, 7, 5], [2, 3, 7, 6], [2, 0, 4, 6]];
             this.vertices = [0, 1, 2, 3, 4, 5, 6, 7];
+            this.lines = [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [3, 7], [2, 6]];
         }
         else if (this.type == 1) {
             const APoint = [this.params.height, 0, 0];
@@ -69,6 +71,7 @@ class Model {
                 btm.push(i + 1);
             }
             this.polys.push(btm);
+            this.vertices = [0];
         }
         else if (this.type == 2) {
             const direct = [this.params.height, 0, 0];
@@ -149,16 +152,25 @@ class Model {
         const vtkPs = vtkPoints.newInstance();
         const polys = vtkCellArray.newInstance();
         const verts = vtkCellArray.newInstance();
-        for (let i = 0; i < this.points.length; i++)
+        const lines = vtkCellArray.newInstance();
+        const points = vtkCellArray.newInstance();
+        for (let i = 0; i < this.points.length; i++) {
             vtkPs.insertNextPoint(this.points[i][0], this.points[i][1], this.points[i][2]);
+            points.insertNextCell([i]);
+        }
         for (let i = 0; i < this.polys.length; i++)
             polys.insertNextCell(this.polys[i]);
-        // for (let i = 0; i < this.vertices.length; i++)
-        verts.insertNextCell(this.vertices);
+        for (let i = 0; i < this.vertices.length; i++)
+            verts.insertNextCell([i]);
+        for (let i = 0; i < this.lines.length; i++)
+            lines.insertNextCell(this.lines[i]);
 
         this.data.setPoints(vtkPs);
-        this.data.setPolys(polys);
-        this.data.setVerts(verts);
+
+        mode[0] ? this.data.setPolys(polys) : 0; // 网格面
+        mode[1] ? this.data.setVerts(verts) : 0; // 顶点
+        mode[2] ? this.data.setVerts(points) : 0; // 网格点
+        mode[3] ? this.data.setLines(lines) : 0; // 边
 
         return this.data;
     }

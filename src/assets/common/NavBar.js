@@ -1,7 +1,7 @@
 import ModelController from "./ModelControl";
 
-const name_en = ["File", "Model", "Sketch", "Design", "Display", "Assembly", "Measure", "Facets", "Repair", "Prepare", "Workbench", "Detail", "Sheet_Metal", "Tools", "KeyShot"];
-const name_zh = ["文件", "建模", "草图", "设计", "展示", "装配", "测量", "平面", "修复", "预处理", "工作台", "详细", "金属薄板", "工具", "渲染"];
+const name_en = ["File", "Model", "Analysis", "Design", "Display", "Assembly", "Measure", "Facets", "Repair", "Prepare", "Workbench", "Detail", "Sheet_Metal", "Tools", "KeyShot"];
+const name_zh = ["文件", "建模", "静态分析", "设计", "展示", "装配", "测量", "平面", "修复", "预处理", "工作台", "详细", "金属薄板", "工具", "渲染"];
 // 0: 大图标 1:中图标 2:小图标 
 const toolModules = [
     // 文件
@@ -23,7 +23,22 @@ const toolModules = [
                     title: "保存",
                     icon: "icon-Save",
                     type: 0,
-                }
+                },
+                {
+                    title: "导出",
+                    icon: "icon-daochumoxing",
+                    type: 0,
+                    sons: [
+                        {
+                            title: " .stl",
+                            id: 0,
+                        },
+                        {
+                            title: ".ply",
+                            id: 1,
+                        },
+                    ],
+                },
             ]
         }
     ],
@@ -33,27 +48,27 @@ const toolModules = [
             name: "模型",
             tools: [
                 {
-                    title: "立方体",
+                    title: ModelController.ModelName[0],
                     icon: ModelController.ModelIcon[0],
                     type: 1,
                 },
                 {
-                    title: "圆柱体",
+                    title: ModelController.ModelName[1],
                     icon: ModelController.ModelIcon[1],
                     type: 1,
                 },
                 {
-                    title: "圆锥",
+                    title: ModelController.ModelName[2],
                     icon: ModelController.ModelIcon[2],
                     type: 1,
                 },
                 {
-                    title: "球体",
+                    title: ModelController.ModelName[3],
                     icon: ModelController.ModelIcon[3],
                     type: 1,
                 },
                 {
-                    title: "导入",
+                    title: ModelController.ModelName[5],
                     icon: ModelController.ModelIcon[5],
                     type: 0,
                 },
@@ -64,27 +79,30 @@ const toolModules = [
             tools: [
                 {
                     title: "草图",
-                    icon: "icon-sketch",
+                    icon: ModelController.FileIcon[3],
                     type: 0,
                 },
                 {
-                    title: "曲线",
-                    icon: "icon-shuizhiquxian",
+                    title: ModelController.SketchName[0],
+                    icon: ModelController.SketchIcon[0],
                     type: 1,
+
                 },
                 {
-                    title: "直线",
-                    icon: "icon-zhixian",
+                    title: ModelController.SketchName[1],
+                    icon: ModelController.SketchIcon[1],
                     type: 1,
+
                 },
                 {
-                    title: "矩形",
-                    icon: "icon-huajuxing",
+                    title: ModelController.SketchName[2],
+                    icon: ModelController.SketchIcon[2],
                     type: 1,
+
                 },
                 {
-                    title: "弧线",
-                    icon: "icon-quxian",
+                    title: ModelController.SketchName[3],
+                    icon: ModelController.SketchIcon[3],
                     type: 1,
                 }
             ]

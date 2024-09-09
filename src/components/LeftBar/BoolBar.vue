@@ -8,7 +8,7 @@ const closeTab = () => EventBus.emit("LeftBar-close", 'BoolBar');
 const handleBoolTypeChange = () => {
 
 }
-EventBus.on('pickActor', data => {
+EventBus.on('pick-actor-bool', data => {
     if (ChooseWhere.value == 0) {
         data = data || { name: '', key: '' };
         targetModel.value = data;

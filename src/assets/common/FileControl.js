@@ -4,6 +4,7 @@ import vtkTriangleFilter from "@kitware/vtk.js/Filters/General/TriangleFilter";
 import vtkSTLReader from '@kitware/vtk.js/IO/Geometry/STLReader';
 import vtkPLYReader from '@kitware/vtk.js/IO/Geometry/PLYReader';
 import EventBus from "./event-bus";
+import { message } from "ant-design-vue";
 
 const JsonToString = obj => JSON.stringify(obj);
 const StringToJSON = str => {
@@ -20,29 +21,28 @@ const downLoadFile = (file, name) => {
     link.click();
     document.body.removeChild(link); // 下载完成移除元素
     window.URL.revokeObjectURL(url); // 释放掉blob对象
+
+    message.success('导出 ' + name + ' 成功');
 }
 const saveFile = (modelController, type = 'PLY') => {
+    const actActor = modelController.activeActor;
+    if (!actActor) {
+        message.error('请选中导出元素再导出');
+        return;
+    }
+    const data = modelController.findModelDataByActor(actActor);
     if (type == 'STL') {
-        const actActor = modelController.activeActor;
-        if (actActor) {
-            const outData = [{}];
-            const data = modelController.findModelDataByActor(actActor);
-            vtkTriangleFilter.newInstance().requestData([modelController.getActiveModel().exportPolyData()], outData);
-            const resAscii = vtkSTLWriter.writeSTL(outData[0], 'ascii', actActor.getMatrix());
-            const resBinary = vtkSTLWriter.writeSTL(outData[0], 'binary', actActor.getMatrix());
-            downLoadFile(resAscii, data.name + '_ascii.stl');
-            downLoadFile(resBinary, data.name + '_binary.stl');
-        }
+        const outData = [{}];
+        vtkTriangleFilter.newInstance().requestData([modelController.getActiveModel().exportPolyData(false)], outData);
+        // const resAscii = vtkSTLWriter.writeSTL(outData[0], 'ascii', actActor.getMatrix());
+        const resBinary = vtkSTLWriter.writeSTL(outData[0], 'binary', actActor.getMatrix());
+        // downLoadFile(resAscii, data.name + '_ascii.stl');
+        downLoadFile(resBinary, data.name + '_binary.stl');
     }
     else if (type == 'PLY') {
-        const actActor = modelController.activeActor;
-        if (actActor) {
-            const outData = modelController.getActiveModel().exportPolyData(false);
-            // const resAscii = vtkPLYWriter.writePLY(outData, 'ascii');
-            const resBinary = vtkPLYWriter.writePLY(outData, 'binary');
-            // downLoadFile(resAscii, data.name + '_ascii.ply');
-            downLoadFile(resBinary, data.name + '_binary.ply');
-        }
+        const outData = modelController.getActiveModel().exportPolyData(false);
+        const resBinary = vtkPLYWriter.writePLY(outData, 'binary');
+        downLoadFile(resBinary, data.name + '_binary.ply');
     }
     else
         downLoadFile("", "");
@@ -72,4 +72,5 @@ const readFile = (file, parent) => {
         fileReader.readAsArrayBuffer(file);
     }
 }
-export { saveFile, readFile };
+const FIlETYPES = ['STL', 'PLY']
+export { saveFile, readFile, FIlETYPES };

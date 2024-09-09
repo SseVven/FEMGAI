@@ -24,14 +24,17 @@ import LightController from '@/assets/common/LightControl';
 import CameraController from '@/assets/common/CameraControl';
 import ModelController from '@/assets/common/ModelControl';
 import InteractorController from '@/assets/common/interactorControl';
-import { saveFile } from '@/assets/common/FileControl';
+import { saveFile, FIlETYPES } from '@/assets/common/FileControl';
 
 const global = {};
 // ================================================================================ 组件控制器
 // 定义模型数据
 const ModelTypeIndex = {};
+const SketchTypeIndex = {};
 for (let i = 0; i < ModelController.ModelName.length; i++)
   ModelTypeIndex[ModelController.ModelName[i]] = i;
+for (let i = 0; i < ModelController.SketchName.length; i++)
+  SketchTypeIndex[ModelController.SketchName[i]] = i;
 const FileIcon = ModelController.FileIcon;
 const ModelData = {
   /*
@@ -93,17 +96,23 @@ EventBus.on('tool-click', (val) => {
         case '打开':
           break;
         case '保存':
-          saveFile(global.modelController, 'PLY');
+          break;
+        case '导出':
+          saveFile(global.modelController, FIlETYPES[val[2]]);
           break;
       }
       break;
     case '模型':
-      if (ModelTypeIndex[val[1]] < 4)
-        global.modelController.createModel3(ModelTypeIndex[val[1]]);
+      const type1 = ModelTypeIndex[val[1]];
+      if (type1 < 4)
+        global.modelController.createModel3(type1);
       else
         EventBus.emit("component-add-query", ['default', 1, 5]);
       break;
     case '直接草图':
+      const type2 = SketchTypeIndex[val[1]];
+      if (type2 >= 0)
+        global.modelController.createModel2(type2);
       break;
     case '布尔运算':
       EventBus.emit("LeftBar-open", ['BoolBar', val[1]]);

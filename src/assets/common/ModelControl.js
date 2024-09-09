@@ -9,14 +9,20 @@ class ModelController {
     static ModelIcon = [
         "icon-m_ac_set", "icon-yuanzhuiti", "icon-cylinder", "icon-fi-sr-sphere", "icon-bueryunsuan", "icon-daorumoxinghuancun",
     ];
-    static FileIcon = [
-        "icon-wenjian", "icon-m_ac_set", "icon-bujian"
-    ];
     static ModelName = [
         "立方体", "圆锥", "圆柱体", "球体", "布尔体", "导入"
     ];
+    static SketchIcon = [
+        "icon-zhixian", "icon-quxian", "icon-shuizhiquxian", "icon-huajuxing",
+    ];
+    static SketchName = [
+        "直线", "圆弧", "曲线", "矩形"
+    ];
+    static FileIcon = [
+        "icon-wenjian", "icon-m_ac_set", "icon-bujian", "icon-sketch"
+    ];
     static FileName = [
-        "File", "Model", "Component"
+        "File", "Model", "Component","Sketch"
     ];
     constructor(renderer, modelData) {
         this.renderer = renderer;
@@ -80,6 +86,10 @@ class ModelController {
 
         this.renderWindow.render();
         return uniqueId;
+    }
+
+    createModel2(type){
+
     }
 
     move(actor, center) {
@@ -263,6 +273,7 @@ class ModelController {
         EventBus.on('pick-actor', prop => {
             this.resetActor();
             this.chooseActor(prop);
+            EventBus.emit('pick-actor-bool', this.findModelDataByActor(prop));
         })
 
         EventBus.on('stl-reader', ([data, parent]) => {
