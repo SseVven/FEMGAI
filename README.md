@@ -1,5 +1,13 @@
 # FEMGAI
 
+## Show
+
+![image-20241118203140131](./assets/image-20241118203140131.png)
+
+![image-20241118203303531](./assets/image-20241118203303531.png)
+
+
+
 This template should help get you started developing with Vue 3 in Vite.
 
 ## Project Setup

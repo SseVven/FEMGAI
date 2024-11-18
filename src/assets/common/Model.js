@@ -184,6 +184,86 @@ class Model {
     }
 }
 
+class Model2d {
+    static defaultParams = [
+        {
+            point: [1, 0, 0],
+        },
+        {
+            radius: 1,
+            height: 1,
+            resolution: 300,
+        },
+        {
+            radius: 1,
+            height: 1,
+            resolution: 300,
+        },
+        {
+            radius: 1,
+            resolution: 300,
+        }
+    ]
+    constructor(type, params, matrix = null) {
+        this.type = type;
+        this.params = params || Model2d.defaultParams[type];
+        this.matrix = matrix || new Matrix();
+        this.data = vtkPolyData.newInstance();
+        this.points = [];
+        this.lines = []; // 模型的几何边
+
+        this.exportPolyData();
+    }
+
+    // 根据参数 this.params 生成对应的 vtkpolydata 以供渲染 
+    // 渲染记得带上变换矩阵 matrix 
+    exportPolyData(isReset = true, mode = [0, 1]) {
+        if (!isReset) {
+            return this.data;
+        }
+        this.points = [];
+        this.lines = [];
+        if (this.type == 0) {
+            this.points = [[0, 0, 0], this.params.point];
+            this.lines = [[0, 1]];
+        }
+        else if (this.type == 1) {
+
+        }
+        else if (this.type == 2) {
+
+        }
+        else if (this.type == 3) {
+
+        }
+        else if (this.type == 4) {
+
+        }
+        const vtkPs = vtkPoints.newInstance();
+        const lines = vtkCellArray.newInstance();
+        for (let i = 0; i < this.points.length; i++) {
+            vtkPs.insertNextPoint(this.points[i][0], this.points[i][1], this.points[i][2]);
+        }
+        for (let i = 0; i < this.lines.length; i++)
+            lines.insertNextCell(this.lines[i]);
+
+        this.data.setPoints(vtkPs);
+
+        // mode[0] ? this.data.setVerts(verts) : 0; // 顶点
+        mode[1] ? this.data.setLines(lines) : 0; // 边
+
+        return this.data;
+    }
+
+    getParams() {
+        return this.params;
+    }
+
+    getMatrix() {
+        return this.matrix;
+    }
+}
+
 // voxel modeling
 class Voxel {
     constructor() {
@@ -556,4 +636,4 @@ class VoxelModel {
     }
 }
 
-export default Model;
+export { Model, Model2d };

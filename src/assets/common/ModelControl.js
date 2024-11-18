@@ -2,7 +2,7 @@ import vtkActor from '@kitware/vtk.js/Rendering/Core/Actor';
 import vtkMapper from '@kitware/vtk.js/Rendering/Core/Mapper';
 import { readFile } from './FileControl';
 import EventBus from './event-bus';
-import Model from "./Model";
+import { Model, Model2d } from "./Model";
 import Matrix from './Matrix';
 
 class ModelController {
@@ -22,7 +22,7 @@ class ModelController {
         "icon-wenjian", "icon-m_ac_set", "icon-bujian", "icon-sketch"
     ];
     static FileName = [
-        "File", "Model", "Component","Sketch"
+        "File", "Model", "Component", "Sketch"
     ];
     constructor(renderer, modelData) {
         this.renderer = renderer;
@@ -88,8 +88,55 @@ class ModelController {
         return uniqueId;
     }
 
-    createModel2(type){
+    createModel2(type, parent = 'default', fParams = null) {
+        const model = new Model2d(type, fParams);
+        const data = model.exportPolyData(false);
+        const actor = vtkActor.newInstance();
+        const mapper = vtkMapper.newInstance();
+        actor.setMapper(mapper);
+        mapper.setInputData(data);
+        this.renderer.addActor(actor);
 
+        const property = actor.getProperty();
+        property.setEdgeColor(0, 0, 1);
+        // property.setEdgeVisibility(true)
+        // property.setRepresentationToWireframe()
+
+        // == 数据存储
+        const uniqueId = this.getAUniKey()
+        this.modelData[uniqueId] = {
+            type: 'Sketch',
+            key: uniqueId,
+            name: ModelController.SketchName[type] + "-" + uniqueId,
+            model_type: type,
+            model: model,
+            actor: actor,
+            params: model.getParams(),
+            data: data,
+            // volumns: [],
+            property: {
+                color: property.getColor(),
+                opacity: property.getOpacity(),
+            },
+            icon: ModelController.SketchIcon[type],
+            parent: parent,
+            visibility: true,
+            // voxelModel: voxelModel,
+        };
+        if (type == 4) {
+            EventBus.emit('remove-componte-query', fParams.target.key);
+            for (let i = 0; i < fParams.tools.length; i++)
+                EventBus.emit('remove-componte-query', fParams.tools[i].key);
+        }
+        // 1：添加节点 ；[x,x]添加到哪一层 ; 节点key； 名称
+        this.modelData[parent].components.push(uniqueId);
+        EventBus.emit("dataStructChange",
+            [1, parent, uniqueId,
+                this.modelData[uniqueId].name,
+                'Model', this.modelData[uniqueId].icon, true]);
+
+        this.renderWindow.render();
+        return uniqueId;
     }
 
     move(actor, center) {
@@ -316,10 +363,10 @@ class ModelController {
 
                 for (let i = 0; i < node.components.length; i++) {
                     const sonNode = this.modelData[node.components[i]];
-                    
+
                     AllTrue &&= sonNode.visibility;
                     AllFalse ||= sonNode.visibility;
-                    if(sonNode.type == 'Component')
+                    if (sonNode.type == 'Component')
                         AllFalse ||= sonNode.subVisibility;
                 }
 
@@ -327,11 +374,11 @@ class ModelController {
                     EventBus.emit("dataStructChange", [2, node.key, true, false]);
                     node.visibility = true;
                     node.subVisibility = false;
-                }else if(AllFalse){
+                } else if (AllFalse) {
                     EventBus.emit("dataStructChange", [2, node.key, false, true]);
                     node.visibility = false;
                     node.subVisibility = true;
-                }else{
+                } else {
                     EventBus.emit("dataStructChange", [2, node.key, false, false]);
                     node.visibility = false;
                     node.subVisibility = false;
